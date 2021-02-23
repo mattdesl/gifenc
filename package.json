@@ -1,0 +1,50 @@
+{
+  "name": "gifenc",
+  "version": "1.0.0",
+  "description": "WASM-powered GIF encoding",
+  "main": "index.js",
+  "license": "MIT",
+  "author": {
+    "name": "Matt DesLauriers",
+    "email": "dave.des@gmail.com",
+    "url": "https://github.com/mattdesl"
+  },
+  "dependencies": {
+    "@assemblyscript/loader": "^0.18.10",
+    "@thi.ng/bitstream": "^1.1.32",
+    "canvas-sketch-util": "^1.10.0"
+  },
+  "devDependencies": {
+    "assemblyscript": "^0.18.10",
+    "ava": "^3.15.0",
+    "esm": "^3.2.25",
+    "get-pixels": "^3.3.2",
+    "serve": "^11.3.2"
+  },
+  "scripts": {
+    "test": "ava",
+    "test:dev": "ava --watch",
+    "asbuild": "asc src/assembly/index.ts --target debug",
+    "asbuild:release": "asc src/assembly/index.ts --target release"
+  },
+  "ava": {
+    "require": [
+      "esm"
+    ],
+    "ignoredByWatcher": [
+      "test/output"
+    ]
+  },
+  "keywords": [
+    "gif",
+    "encoder"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/mattdesl/gifenc.git"
+  },
+  "homepage": "https://github.com/mattdesl/gifenc",
+  "bugs": {
+    "url": "https://github.com/mattdesl/gifenc/issues"
+  }
+}
