@@ -25,7 +25,7 @@ Some features that could be explored in a future version:
 
 ## Example
 
-You can see a simple example here.
+You can see a simple example [here](https://codepen.io/mattdesl/full/vYypMXv).
 
 You can see a more advanced example of this encoder in action inside [looom-tools.netlify.app](https://looom-tools.netlify.app/).
 
@@ -34,7 +34,7 @@ Also see [./test/node-encode.js](./test/node-encode.js) for a pure Node.js examp
 Basic code example:
 
 ```js
-import { GIFEncoder, quantize, applyPalette } from 'gifenc';
+import { GIFEncoder, quantize, applyPalette } from 'https://unpkg.com/gifenc@1.0.1';
 
 // Get your RGBA image into Uint8Array data, such as from canvas
 const { data, width, height } = /* ... getImageData() ... */;
