@@ -2,7 +2,12 @@
   "name": "gifenc",
   "version": "1.0.0",
   "description": "very fast JS GIF encoder",
-  "main": "./src/index.js",
+  "main": "./dist/gifenc.js",
+  "browser": "./dist/gifenc.js",
+  "source": "./src/index.js",
+  "unpkg": "./dist/gifenc.esm.js",
+  "jsdelivr": "./dist/gifenc.esm.js",
+  "module": "./dist/gifenc.esm.js",
   "license": "MIT",
   "author": {
     "name": "Matt DesLauriers",
@@ -11,17 +16,18 @@
   },
   "dependencies": {},
   "devDependencies": {
-    "canvas-sketch-util": "^1.10.0",
     "ava": "^3.15.0",
+    "canvas-sketch-util": "^1.10.0",
+    "esbuild": "^0.8.52",
     "esm": "^3.2.25",
     "get-pixels": "^3.3.2",
     "serve": "^11.3.2"
   },
   "scripts": {
-    "test": "ava",
-    "test:dev": "ava --watch",
-    "asbuild": "asc src/assembly/index.ts --target debug",
-    "asbuild:release": "asc src/assembly/index.ts --target release"
+    "prepublishOnly": "npm run dist:esm && npm run dist:cjs",
+    "serve": "serve .",
+    "dist:esm": "esbuild ./src/index.js --bundle --format=esm --outfile=dist/gifenc.esm.js --minify --sourcemap --target=chrome58,firefox57,safari11,edge16,node12",
+    "dist:cjs": "esbuild ./src/index.js --bundle --format=cjs --outfile=dist/gifenc.js --minify --sourcemap --target=chrome58,firefox57,safari11,edge16,node12"
   },
   "ava": {
     "require": [

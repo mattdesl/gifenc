@@ -145,9 +145,10 @@ export default function quantize(data, maxColors, opts) {
     clearAlpha = true,
     clearAlphaColor = 0x00,
     clearAlphaThreshold = 0,
-    useSqrt = true,
     oneBitAlpha = false,
   } = opts || {};
+
+  let useSqrt = opts.useSqrt !== false;
 
   // format can be:
   // rgb565 (default)
