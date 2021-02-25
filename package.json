@@ -1,21 +1,17 @@
 {
   "name": "gifenc",
   "version": "1.0.0",
-  "description": "WASM-powered GIF encoding",
-  "main": "index.js",
+  "description": "very fast JS GIF encoder",
+  "main": "./src/index.js",
   "license": "MIT",
   "author": {
     "name": "Matt DesLauriers",
     "email": "dave.des@gmail.com",
     "url": "https://github.com/mattdesl"
   },
-  "dependencies": {
-    "@assemblyscript/loader": "^0.18.10",
-    "@thi.ng/bitstream": "^1.1.32",
-    "canvas-sketch-util": "^1.10.0"
-  },
+  "dependencies": {},
   "devDependencies": {
-    "assemblyscript": "^0.18.10",
+    "canvas-sketch-util": "^1.10.0",
     "ava": "^3.15.0",
     "esm": "^3.2.25",
     "get-pixels": "^3.3.2",

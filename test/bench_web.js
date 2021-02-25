@@ -1,7 +1,13 @@
-import GIF, { nearestImageData, quantize } from "../src/encoder";
-// import quantize from "../src/nQuant2";
-// import { nearest, colorSnap } from "../src/palettize";
 import Color from "canvas-sketch-util/color";
+
+import {
+  GIFEncoder,
+  applyPalette,
+  prequantize,
+  colorSnap,
+  findTransparentIndex,
+  quantize,
+} from "../src";
 
 async function readImage(url) {
   const img = await loadImage(url);
@@ -35,10 +41,12 @@ function getPixels(rgba, alpha = true) {
 }
 
 (async () => {
-  const { data, width, height } = await readImage("/test/fixtures/007.png");
-  const pixels = getPixels(data);
+  const { data, width, height } = await readImage(
+    "/test/fixtures/007-transparent.png"
+  );
+  // const pixels = getPixels(data);
 
-  const hasAlpha = false;
+  // const hasAlpha = false;
 
   // console.time("quantize");
   // console.profile("quantize");
@@ -65,47 +73,44 @@ function getPixels(rgba, alpha = true) {
   let index;
   let buf1;
 
+  const format = "rgba4444";
   const uint32 = new Uint32Array(data.buffer);
+
+  // with GIF we have 1-bit alpha so we can clear that
+  prequantize(uint32, { roundRGB: 1, oneBitAlpha: true });
+  palette = quantize(uint32, 256, { format, oneBitAlpha: true });
+  // optionally snap colors to known palette
+  colorSnap(palette, knownColors);
+
   console.time("quantize");
   console.profile("quantize");
-  for (let i = 0; i < 200; i++) {
-    palette = quantize(uint32, width, height, 256);
-  }
+  // palettization is always done in RGB only space
+  // since we are dealing with GIF which has 1-bit alpha
+  index = applyPalette(
+    uint32,
+    palette,
+    format === "rgb565" ? format : "rgb444"
+  );
   console.profileEnd("quantize");
   console.timeEnd("quantize");
 
-  index = nearestImageData(data, width, height, 4, palette);
+  const gif = GIFEncoder();
+  gif.writeFrame(index, width, height, {
+    // 1-bit alpha based on alpha channel
+    transparent: format === "rgba4444",
+    transparentIndex: findTransparentIndex(palette),
 
-  const gif = GIF();
-  gif.writeHeader();
-  gif.writeFrame(index, width, height, { first: true, palette });
+    // replace a color with transparency
+    // this tends to blend better
+    // transparent: true,
+    // transparentIndex: nearestColorIndex([0, 0, 0], palette),
+    palette,
+  });
   gif.finish();
 
   const blob = new Blob([gif.bytes()], { type: "image/gif" });
   const image = await loadImage(URL.createObjectURL(blob));
-  image.style.width = "250px";
+  image.style.width = "25%";
   image.style.height = "auto";
   document.body.appendChild(image);
-
-  // const HSIZE = 5003;
-  // const enc = LZWEncoder.exports.encode(
-  //   4,
-  //   2,
-  //   new Uint8Array([0, 2, 1, 0, 0, 0, 1, 0]),
-  //   8,
-  //   new Uint8Array(256),
-  //   new Int32Array(HSIZE),
-  //   new Int32Array(HSIZE)
-  // );
-  // const arr = LZWEncoder.exports.__getUint8ArrayView(enc);
-  // console.log(arr);
-
-  // console.profile("encode");
-  // console.time("encode");
-  // for (let i = 0; i < 100; i++) {
-  //   const buf = encode(indexImage);
-  //   console.log(buf.length);
-  // }
-  // console.profileEnd("encode");
-  // console.timeEnd("encode");
 })();

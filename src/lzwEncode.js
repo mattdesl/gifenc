@@ -16,9 +16,10 @@
   Ken Turkowski (decvax!decwrl!turtlevax!ken)
   James A. Woods (decvax!ihnp4!ames!jaw)
   Joe Orost (decvax!vax135!petsd!joe)
+  Matt DesLauriers (@mattdesl - V8/JS optimizations)
 */
 
-import createBuffer from "./buffer.js";
+import createStream from "./stream.js";
 
 const EOF = -1;
 const BITS = 12;
@@ -53,7 +54,7 @@ function lzwEncode(
   htab,
   codetab
 ) {
-  outStream = outStream || createBuffer(512);
+  outStream = outStream || createStream(512);
   accum = accum || new Uint8Array(256);
   htab = htab || new Int32Array(DEFAULT_HSIZE);
   codetab = codetab || new Int32Array(DEFAULT_HSIZE);
@@ -62,8 +63,8 @@ function lzwEncode(
   const initCodeSize = Math.max(2, colorDepth);
 
   accum.fill(0);
-  htab.fill(0);
   codetab.fill(0);
+  clear_hash();
 
   let cur_accum = 0;
   let cur_bits = 0;
@@ -106,8 +107,6 @@ function lzwEncode(
     ++hshift;
   }
   hshift = 8 - hshift; // set hash code range bound
-
-  clear_hash(); // clear hash table
 
   outStream.writeByte(initCodeSize); // write "initial code size" byte
 

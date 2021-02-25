@@ -37,3 +37,17 @@ export function colorDifferenceRGBToYIQSquared(rgb1, rgb2) {
 export function colorDifferenceRGBToYIQ(rgb1, rgb2) {
   return Math.sqrt(colorDifferenceRGBToYIQSquared(rgb1, rgb2));
 }
+
+export function euclideanDistanceSquared(a, b) {
+  var sum = 0;
+  var n;
+  for (n = 0; n < a.length; n++) {
+    const dx = a[n] - b[n];
+    sum += dx * dx;
+  }
+  return sum;
+}
+
+export function euclideanDistance(a, b) {
+  return Math.sqrt(euclideanDistanceSquared(a, b));
+}

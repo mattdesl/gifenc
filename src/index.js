@@ -1,22 +1,36 @@
 import constants from "./constants.js";
-import lzw from "./lzw.js";
-import Image from "./Image.js";
-import LZWEncoder from "./LZWEncoder";
-import { BitOutputStream } from "@thi.ng/bitstream";
-import createBuffer from "./buffer.js";
-import quantize from "./nQuant2.js";
-import { nearest, nearestImageData, colorSnap } from "./palettize";
+import lzwEncode from "./lzwEncode";
+import createStream from "./stream.js";
+import quantize from "./pnnquant2.js";
 
-export { quantize, nearest, colorSnap, nearestImageData };
+import {
+  prequantize,
+  applyPalette,
+  nearestColorIndex,
+  nearestColor,
+  nearestColorIndexWithDistance,
+  colorSnap,
+} from "./palettize";
 
-const HSIZE = 5003; // 80% occupancy
-const accum = new Uint8Array(256);
-const htab = new Int32Array(HSIZE);
-const codetab = new Int32Array(HSIZE);
+function GIFEncoder(opt = {}) {
+  const { initialCapacity = 4096, auto = true } = opt;
 
-export default function GIF(initialCapacity = 4096) {
-  const stream = createBuffer(initialCapacity);
+  // Stream all encoded data into this buffer
+  const stream = createStream(initialCapacity);
+
+  // Shared array data across all frames
+  const HSIZE = 5003; // 80% occupancy
+  const accum = new Uint8Array(256);
+  const htab = new Int32Array(HSIZE);
+  const codetab = new Int32Array(HSIZE);
+
+  let hasInit = false;
+
   return {
+    reset() {
+      stream.reset();
+      hasInit = false;
+    },
     finish() {
       stream.writeByte(constants.trailer);
     },
@@ -32,13 +46,11 @@ export default function GIF(initialCapacity = 4096) {
     get stream() {
       return stream;
     },
-    writeHeader() {
-      writeUTFBytes(stream, "GIF89a");
-    },
+    writeHeader,
     writeFrame(index, width, height, opts = {}) {
       const {
-        first = false,
-        transparent = -1,
+        transparent = false,
+        transparentIndex = 0x00,
         delay = 0,
         palette = null,
         repeat = 0, // -1=once, 0=forever, >0=count
@@ -46,13 +58,32 @@ export default function GIF(initialCapacity = 4096) {
         dispose = -1,
       } = opts;
 
+      let first = false;
+      if (auto) {
+        // In 'auto' mode, the first time we write a frame
+        // we will write LSD/GCT/EXT
+        if (!hasInit) {
+          // have not yet init, we can consider this our first frame
+          first = true;
+          // in 'auto' mode, we also encode a header on first frame
+          // this is different than manual mode where you must encode
+          // header yoursef (or perhaps not write header altogether)
+          writeHeader();
+          hasInit = true;
+        }
+      } else {
+        // in manual mode, the first frame is determined by the options only
+        first = Boolean(opts.first);
+      }
+
       width = Math.max(0, Math.floor(width));
       height = Math.max(0, Math.floor(height));
 
       // Write pre-frame details such as repeat count and global palette
       if (first) {
-        if (!palette)
-          throw new Error("First frame must include a color table palette");
+        if (!palette) {
+          throw new Error("First frame must include a { palette } option");
+        }
         encodeLogicalScreenDescriptor(
           stream,
           width,
@@ -67,7 +98,13 @@ export default function GIF(initialCapacity = 4096) {
       }
 
       const delayTime = Math.round(delay / 10);
-      encodeGraphicControlExt(stream, dispose, delayTime, transparent);
+      encodeGraphicControlExt(
+        stream,
+        dispose,
+        delayTime,
+        transparent,
+        transparentIndex
+      );
 
       const useLocalColorTable = Boolean(palette) && !first;
       encodeImageDescriptor(
@@ -77,18 +114,42 @@ export default function GIF(initialCapacity = 4096) {
         useLocalColorTable ? palette : null
       );
       if (useLocalColorTable) encodeColorTable(stream, palette);
-      encodePixels(stream, index, width, height, colorDepth);
+      encodePixels(
+        stream,
+        index,
+        width,
+        height,
+        colorDepth,
+        accum,
+        htab,
+        codetab
+      );
     },
   };
+
+  function writeHeader() {
+    writeUTFBytes(stream, "GIF89a");
+  }
 }
 
-function encodeGraphicControlExt(stream, dispose, delay, transparent) {
+function encodeGraphicControlExt(
+  stream,
+  dispose,
+  delay,
+  transparent,
+  transparentIndex
+) {
   stream.writeByte(0x21); // extension introducer
   stream.writeByte(0xf9); // GCE label
   stream.writeByte(4); // data block size
 
+  if (transparentIndex < 0) {
+    transparentIndex = 0x00;
+    transparent = false;
+  }
+
   var transp, disp;
-  if (transparent == null || transparent === -1) {
+  if (!transparent) {
     transp = 0;
     disp = 0; // dispose = no action
   } else {
@@ -99,6 +160,7 @@ function encodeGraphicControlExt(stream, dispose, delay, transparent) {
   if (dispose >= 0) {
     disp = dispose & 7; // user override
   }
+
   disp <<= 2;
 
   const userInput = 0;
@@ -111,11 +173,8 @@ function encodeGraphicControlExt(stream, dispose, delay, transparent) {
       transp // 8 transparency flag
   );
 
-  const transparentIndex =
-    transparent == null || transparent === -1 ? 0x00 : transparent;
-
   writeUInt16(stream, delay); // delay x 1/100 sec
-  stream.writeByte(transparentIndex); // transparent color index
+  stream.writeByte(transparentIndex || 0x00); // transparent color index
   stream.writeByte(0); // block terminator
 }
 
@@ -191,8 +250,17 @@ function encodeImageDescriptor(stream, width, height, localPalette) {
   }
 }
 
-function encodePixels(stream, index, width, height, colorDepth = 8) {
-  LZWEncoder(width, height, index, colorDepth, stream, accum, htab, codetab);
+function encodePixels(
+  stream,
+  index,
+  width,
+  height,
+  colorDepth = 8,
+  accum,
+  htab,
+  codetab
+) {
+  lzwEncode(width, height, index, colorDepth, stream, accum, htab, codetab);
 }
 
 // Utilities
@@ -211,3 +279,16 @@ function writeUTFBytes(stream, text) {
 function colorTableSize(length) {
   return Math.max(Math.ceil(Math.log2(length)), 1);
 }
+
+export {
+  GIFEncoder,
+  quantize,
+  prequantize,
+  applyPalette,
+  nearestColorIndex,
+  nearestColor,
+  nearestColorIndexWithDistance,
+  colorSnap,
+};
+
+export default GIFEncoder;

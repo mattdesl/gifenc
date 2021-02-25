@@ -1,4 +1,4 @@
-export default function createBuffer(initialCapacity = 256) {
+export default function createStream(initialCapacity = 256) {
   let cursor = 0;
   let contents = new Uint8Array(initialCapacity);
 
