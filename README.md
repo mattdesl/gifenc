@@ -42,8 +42,11 @@ const { data, width, height } = /* ... getImageData() ... */;
 // Wrap RGBA in a typed buffer view for faster access
 const uint32 = new Uint32Array(data.buffer);
 
-// Get a 256-color RGB palette
-const palette = quantize(uint32, 256);
+// Choose a pixel format: rgba4444, rgb444, rgb565
+const format = "rgb444";
+
+// Quantize your colors to a 256-color RGB palette palette
+const palette = quantize(uint32, 256, { format });
 
 // Get an indexed bitmap by reducing each pixel to the nearest color palette
 const index = applyPalette(uint32, palette);
