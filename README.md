@@ -46,7 +46,7 @@ const uint32 = new Uint32Array(data.buffer);
 const palette = quantize(uint32, 256);
 
 // Get an indexed bitmap by reducing each pixel to the nearest color palette
-const index = applyPalette(uint23, palette);
+const index = applyPalette(uint32, palette);
 
 // Create an encoding stream
 const gif = GIFEncoder();
