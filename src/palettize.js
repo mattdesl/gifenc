@@ -34,9 +34,7 @@ export function prequantize(
   }
 }
 
-export function applyPalette(data, palette, format) {
-  format = format || "rgb565";
-
+export function applyPalette(data, palette, format = "rgb565") {
   const bincount = format === "rgb444" ? 4096 : 65536;
   const index = new Uint8Array(data.length);
   const cache = new Array(bincount);
@@ -62,15 +60,14 @@ export function applyPalette(data, palette, format) {
       index[i] = idx;
     }
   } else {
+    const rgb888_to_key = format === "rgb444"
+      ? rgb888_to_rgb444 : rgb888_to_rgb565;
     for (let i = 0; i < data.length; i++) {
       const color = data[i];
       const b = (color >> 16) & 0xff;
       const g = (color >> 8) & 0xff;
       const r = color & 0xff;
-      const key =
-        format === "rgb444"
-          ? rgb888_to_rgb444(r, g, b)
-          : rgb888_to_rgb565(r, g, b);
+      const key = rgb888_to_key(r, g, b);
       let idx;
       if (cache[key] != null) {
         idx = cache[key];
@@ -96,16 +93,16 @@ function nearestColorIndexRGBA(r, g, b, a, palette) {
   let mindist = 1e100;
   for (let i = 0; i < palette.length; i++) {
     const px2 = palette[i];
-    const r2 = px2[0];
-    const g2 = px2[1];
-    const b2 = px2[2];
     const a2 = px2[3];
     let curdist = sqr(a2 - a);
     if (curdist > mindist) continue;
+    const r2 = px2[0];
     curdist += sqr(r2 - r);
     if (curdist > mindist) continue;
+    const g2 = px2[1];
     curdist += sqr(g2 - g);
     if (curdist > mindist) continue;
+    const b2 = px2[2];
     curdist += sqr(b2 - b);
     if (curdist > mindist) continue;
     mindist = curdist;
@@ -120,12 +117,12 @@ function nearestColorIndexRGB(r, g, b, palette) {
   for (let i = 0; i < palette.length; i++) {
     const px2 = palette[i];
     const r2 = px2[0];
-    const g2 = px2[1];
-    const b2 = px2[2];
     let curdist = sqr(r2 - r);
     if (curdist > mindist) continue;
+    const g2 = px2[1];
     curdist += sqr(g2 - g);
     if (curdist > mindist) continue;
+    const b2 = px2[2];
     curdist += sqr(b2 - b);
     if (curdist > mindist) continue;
     mindist = curdist;
