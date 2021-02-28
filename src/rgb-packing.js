@@ -7,11 +7,11 @@ export function uint32_to_rgba(color) {
 }
 
 export function rgba_to_uint32(r, g, b, a) {
-  return (a << 24) | (b << 16) | (g << 8) | (r << 0);
+  return (a << 24) | (b << 16) | (g << 8) | r;
 }
 
 export function rgb888_to_rgb565(r, g, b) {
-  return ((r << 8) & 0xf800) | ((g << 2) & 0x03e0) | ((b >> 3) & 0x001f);
+  return ((r << 8) & 0xf800) | ((g << 2) & 0x03e0) | (b >> 3);
 }
 
 export function rgba8888_to_rgba4444(r, g, b, a) {
@@ -19,7 +19,7 @@ export function rgba8888_to_rgba4444(r, g, b, a) {
 }
 
 export function rgb888_to_rgb444(r, g, b) {
-  return ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4);
+  return ((r >> 4) << 8) | (g & 0xf0) | (b >> 4);
 }
 
 // Alternative 565 ?
