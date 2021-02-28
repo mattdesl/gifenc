@@ -10,7 +10,7 @@ import {
   rgb888_to_rgb565,
   rgb888_to_rgb444,
   rgba8888_to_rgba4444,
-} from "./rgb-packing";
+} from "./rgb-packing.js";
 
 function clamp(value, min, max) {
   return value < min ? min : value > max ? max : value;

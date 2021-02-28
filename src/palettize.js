@@ -2,9 +2,9 @@ import {
   rgb888_to_rgb444,
   rgb888_to_rgb565,
   rgba8888_to_rgba4444,
-} from "./rgb-packing";
+} from "./rgb-packing.js";
 
-const { euclideanDistanceSquared } = require("./color");
+import { euclideanDistanceSquared } from "./color.js";
 
 function roundStep(byte, step) {
   return step > 1 ? Math.round(byte / step) * step : byte;
