@@ -1,86 +1,22 @@
 var __defProp = Object.defineProperty;
 var __markAsModule = (target) => __defProp(target, "__esModule", {value: true});
-var __commonJS = (callback, module2) => () => {
-  if (!module2) {
-    module2 = {exports: {}};
-    callback(module2.exports, module2);
-  }
-  return module2.exports;
-};
 var __export = (target, all) => {
   for (var name in all)
     __defProp(target, name, {get: all[name], enumerable: true});
 };
-
-// src/color.js
-var require_color = __commonJS((exports2) => {
-  __markAsModule(exports2);
-  __export(exports2, {
-    colorDifferenceRGBToYIQ: () => colorDifferenceRGBToYIQ,
-    colorDifferenceRGBToYIQSquared: () => colorDifferenceRGBToYIQSquared,
-    colorDifferenceYIQ: () => colorDifferenceYIQ,
-    colorDifferenceYIQSquared: () => colorDifferenceYIQSquared,
-    euclideanDistance: () => euclideanDistance,
-    euclideanDistanceSquared: () => euclideanDistanceSquared2
-  });
-  function rgb2y(r, g, b) {
-    return r * 0.29889531 + g * 0.58662247 + b * 0.11448223;
-  }
-  function rgb2i(r, g, b) {
-    return r * 0.59597799 - g * 0.2741761 - b * 0.32180189;
-  }
-  function rgb2q(r, g, b) {
-    return r * 0.21147017 - g * 0.52261711 + b * 0.31114694;
-  }
-  function colorDifferenceYIQSquared(yiqA, yiqB) {
-    const y = yiqA[0] - yiqB[0];
-    const i = yiqA[1] - yiqB[1];
-    const q = yiqA[2] - yiqB[2];
-    const a = alpha(yiqA) - alpha(yiqB);
-    return y * y * 0.5053 + i * i * 0.299 + q * q * 0.1957 + a * a;
-  }
-  function alpha(array) {
-    return array[3] != null ? array[3] : 255;
-  }
-  function colorDifferenceYIQ(yiqA, yiqB) {
-    return Math.sqrt(colorDifferenceYIQSquared(yiqA, yiqB));
-  }
-  function colorDifferenceRGBToYIQSquared(rgb1, rgb2) {
-    const [r1, g1, b1] = rgb1;
-    const [r2, g2, b2] = rgb2;
-    const y = rgb2y(r1, g1, b1) - rgb2y(r2, g2, b2), i = rgb2i(r1, g1, b1) - rgb2i(r2, g2, b2), q = rgb2q(r1, g1, b1) - rgb2q(r2, g2, b2);
-    const a = alpha(rgb1) - alpha(rgb2);
-    return y * y * 0.5053 + i * i * 0.299 + q * q * 0.1957 + a * a;
-  }
-  function colorDifferenceRGBToYIQ(rgb1, rgb2) {
-    return Math.sqrt(colorDifferenceRGBToYIQSquared(rgb1, rgb2));
-  }
-  function euclideanDistanceSquared2(a, b) {
-    var sum = 0;
-    var n;
-    for (n = 0; n < a.length; n++) {
-      const dx = a[n] - b[n];
-      sum += dx * dx;
-    }
-    return sum;
-  }
-  function euclideanDistance(a, b) {
-    return Math.sqrt(euclideanDistanceSquared2(a, b));
-  }
-});
 
 // src/index.js
 __markAsModule(exports);
 __export(exports, {
   GIFEncoder: () => GIFEncoder,
   applyPalette: () => applyPalette,
-  colorSnap: () => colorSnap,
   default: () => src_default,
   nearestColor: () => nearestColor,
   nearestColorIndex: () => nearestColorIndex,
   nearestColorIndexWithDistance: () => nearestColorIndexWithDistance,
   prequantize: () => prequantize,
-  quantize: () => quantize
+  quantize: () => quantize,
+  snapColorsToPalette: () => snapColorsToPalette
 });
 
 // src/constants.js
@@ -307,13 +243,13 @@ var lzwEncode_default = lzwEncode;
 
 // src/rgb-packing.js
 function rgb888_to_rgb565(r, g, b) {
-  return r << 8 & 63488 | g << 2 & 992 | b >> 3 & 31;
+  return r << 8 & 63488 | g << 2 & 992 | b >> 3;
 }
 function rgba8888_to_rgba4444(r, g, b, a) {
   return r >> 4 | g & 240 | (b & 240) << 4 | (a & 240) << 8;
 }
 function rgb888_to_rgb444(r, g, b) {
-  return r >> 4 << 8 | g >> 4 << 4 | b >> 4;
+  return r >> 4 << 8 | g & 240 | b >> 4;
 }
 
 // src/pnnquant2.js
@@ -420,7 +356,7 @@ function create_bin_list(data, format) {
   }
   return bins;
 }
-function quantize(data, maxColors, opts) {
+function quantize(rgba, maxColors, opts) {
   const {
     format = "rgb565",
     clearAlpha = true,
@@ -428,6 +364,13 @@ function quantize(data, maxColors, opts) {
     clearAlphaThreshold = 0,
     oneBitAlpha = false
   } = opts || {};
+  if (!rgba || !rgba.buffer) {
+    throw new Error("quantize() expected RGBA Uint8Array data");
+  }
+  if (!(rgba instanceof Uint8Array) && !(rgba instanceof Uint8ClampedArray)) {
+    throw new Error("quantize() expected RGBA Uint8Array data");
+  }
+  const data = new Uint32Array(rgba.buffer);
   let useSqrt = opts.useSqrt !== false;
   const hasAlpha = format === "rgba4444";
   const bins = create_bin_list(data, format);
@@ -548,8 +491,18 @@ function existsInPalette(palette, color) {
   return false;
 }
 
+// src/color.js
+function euclideanDistanceSquared(a, b) {
+  var sum = 0;
+  var n;
+  for (n = 0; n < a.length; n++) {
+    const dx = a[n] - b[n];
+    sum += dx * dx;
+  }
+  return sum;
+}
+
 // src/palettize.js
-var {euclideanDistanceSquared} = require_color();
 function roundStep(byte, step) {
   return step > 1 ? Math.round(byte / step) * step : byte;
 }
@@ -571,8 +524,14 @@ function prequantize(data, {roundRGB = 5, roundAlpha = 10, oneBitAlpha = null} =
     data[i] = a << 24 | b << 16 | g << 8 | r << 0;
   }
 }
-function applyPalette(data, palette, format) {
-  format = format || "rgb565";
+function applyPalette(rgba, palette, format = "rgb565") {
+  if (!rgba || !rgba.buffer) {
+    throw new Error("quantize() expected RGBA Uint8Array data");
+  }
+  if (!(rgba instanceof Uint8Array) && !(rgba instanceof Uint8ClampedArray)) {
+    throw new Error("quantize() expected RGBA Uint8Array data");
+  }
+  const data = new Uint32Array(rgba.buffer);
   const bincount = format === "rgb444" ? 4096 : 65536;
   const index = new Uint8Array(data.length);
   const cache = new Array(bincount);
@@ -595,12 +554,13 @@ function applyPalette(data, palette, format) {
       index[i] = idx;
     }
   } else {
+    const rgb888_to_key = format === "rgb444" ? rgb888_to_rgb444 : rgb888_to_rgb565;
     for (let i = 0; i < data.length; i++) {
       const color = data[i];
       const b = color >> 16 & 255;
       const g = color >> 8 & 255;
       const r = color & 255;
-      const key = format === "rgb444" ? rgb888_to_rgb444(r, g, b) : rgb888_to_rgb565(r, g, b);
+      const key = rgb888_to_key(r, g, b);
       let idx;
       if (cache[key] != null) {
         idx = cache[key];
@@ -618,19 +578,19 @@ function nearestColorIndexRGBA(r, g, b, a, palette) {
   let mindist = 1e100;
   for (let i = 0; i < palette.length; i++) {
     const px2 = palette[i];
-    const r2 = px2[0];
-    const g2 = px2[1];
-    const b2 = px2[2];
     const a2 = px2[3];
     let curdist = sqr2(a2 - a);
     if (curdist > mindist)
       continue;
+    const r2 = px2[0];
     curdist += sqr2(r2 - r);
     if (curdist > mindist)
       continue;
+    const g2 = px2[1];
     curdist += sqr2(g2 - g);
     if (curdist > mindist)
       continue;
+    const b2 = px2[2];
     curdist += sqr2(b2 - b);
     if (curdist > mindist)
       continue;
@@ -645,14 +605,14 @@ function nearestColorIndexRGB(r, g, b, palette) {
   for (let i = 0; i < palette.length; i++) {
     const px2 = palette[i];
     const r2 = px2[0];
-    const g2 = px2[1];
-    const b2 = px2[2];
     let curdist = sqr2(r2 - r);
     if (curdist > mindist)
       continue;
+    const g2 = px2[1];
     curdist += sqr2(g2 - g);
     if (curdist > mindist)
       continue;
+    const b2 = px2[2];
     curdist += sqr2(b2 - b);
     if (curdist > mindist)
       continue;
@@ -661,7 +621,7 @@ function nearestColorIndexRGB(r, g, b, palette) {
   }
   return k;
 }
-function colorSnap(palette, knownColors, threshold = 5) {
+function snapColorsToPalette(palette, knownColors, threshold = 5) {
   if (!palette.length || !knownColors.length)
     return;
   const paletteRGB = palette.map((p) => p.slice(0, 3));

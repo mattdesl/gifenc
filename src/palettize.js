@@ -11,9 +11,10 @@ function roundStep(byte, step) {
 }
 
 export function prequantize(
-  data,
+  rgba,
   { roundRGB = 5, roundAlpha = 10, oneBitAlpha = null } = {}
 ) {
+  const data = new Uint32Array(rgba.buffer);
   for (let i = 0; i < data.length; i++) {
     const color = data[i];
     let a = (color >> 24) & 0xff;
@@ -34,7 +35,18 @@ export function prequantize(
   }
 }
 
-export function applyPalette(data, palette, format = "rgb565") {
+export function applyPalette(rgba, palette, format = "rgb565") {
+  if (!rgba || !rgba.buffer) {
+    throw new Error('quantize() expected RGBA Uint8Array data');
+  }
+  if (!(rgba instanceof Uint8Array) && !(rgba instanceof Uint8ClampedArray)) {
+    throw new Error('quantize() expected RGBA Uint8Array data');
+  }
+  if (palette.length > 256) {
+    throw new Error('applyPalette() only works with 256 colors or less');
+  }
+
+  const data = new Uint32Array(rgba.buffer);
   const bincount = format === "rgb444" ? 4096 : 65536;
   const index = new Uint8Array(data.length);
   const cache = new Array(bincount);
@@ -130,7 +142,7 @@ function nearestColorIndexRGB(r, g, b, palette) {
   return k;
 }
 
-export function colorSnap(palette, knownColors, threshold = 5) {
+export function snapColorsToPalette(palette, knownColors, threshold = 5) {
   if (!palette.length || !knownColors.length) return;
 
   const paletteRGB = palette.map((p) => p.slice(0, 3));

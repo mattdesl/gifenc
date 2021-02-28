@@ -13,17 +13,14 @@ async function encode() {
     path.resolve(__dirname, "fixtures/baboon.png")
   );
 
-  // Wrap your RGBA uint8array into a uint32 array
-  const uint32 = new Uint32Array(data.buffer);
-
   // Choose a pixel format: rgba4444, rgb444, rgb565
   const format = "rgb444";
 
   // If necessary, quantize your colors to a reduced palette
-  const palette = quantize(uint32, 256, { format });
+  const palette = quantize(data, 256, { format });
 
   // Apply palette to RGBA data to get an indexed bitmap
-  const index = applyPalette(uint32, palette, format);
+  const index = applyPalette(data, palette, format);
 
   // Now let's encode it into a GIF
   const gif = GIFEncoder();

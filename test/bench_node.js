@@ -14,35 +14,33 @@ const N = 100;
     path.resolve(__dirname, "fixtures/baboon.png")
   );
 
-  // Wrap your RGBA uint8array into a uint32 array
-  const uint32 = new Uint32Array(data.buffer);
   const format = 'rgb444';
 
-  bench_quantize(uint32, format);
+  bench_quantize(data, format);
 
-  const palette = quantize(uint32, 256, { format })
-  bench_palette(uint32, palette, format);
+  const palette = quantize(data, 256, { format })
+  bench_palette(data, palette, format);
 
-  const index = applyPalette(uint32, palette, format);
+  const index = applyPalette(data, palette, format);
   bench_encode(index, width, height, palette);
 })();
 
-async function bench_quantize(uint32, format) {
+async function bench_quantize(data, format) {
   console.log('Quantization')
   console.time('time');
   let palette;
   for (let i = 0; i < N; i++) {
-    palette = quantize(uint32, 256, { format });
+    palette = quantize(data, 256, { format });
   }
   console.timeEnd('time');
 }
 
-async function bench_palette(uint32, palette, format) {
+async function bench_palette(data, palette, format) {
   console.log('Palettization')
   console.time('time');
   let index;
   for (let i = 0; i < N; i++) {
-    index = applyPalette(uint32, palette, format);
+    index = applyPalette(data, palette, format);
   }
   console.timeEnd('time');
 }

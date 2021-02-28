@@ -31,35 +31,34 @@ async function loadImage(url) {
     "/test/fixtures/007-transparent.png"
   );
 
-  const uint32 = new Uint32Array(data.buffer);
   const format = 'rgb444';
 
-  bench_quantize(uint32, format);
+  bench_quantize(data, format);
 
-  const palette = quantize(uint32, 256, { format })
-  bench_palette(uint32, palette, format);
+  const palette = quantize(data, 256, { format })
+  bench_palette(data, palette, format);
 
-  const index = applyPalette(uint32, palette, format);
+  const index = applyPalette(data, palette, format);
   bench_encode(index, width, height, palette);
 })();
 
-async function bench_quantize(uint32, format) {
+async function bench_quantize(rgba, format) {
   console.time('quantize');
   console.profile('quantize');
   let palette;
   for (let i = 0; i < N; i++) {
-    palette = quantize(uint32, 256, { format });
+    palette = quantize(rgba, 256, { format });
   }
   console.profileEnd('quantize');
   console.timeEnd('quantize');
 }
 
-async function bench_palette(uint32, palette, format) {
+async function bench_palette(data, palette, format) {
   console.time('applyPalette');
   console.profile('applyPalette');
   let index;
   for (let i = 0; i < N; i++) {
-    index = applyPalette(uint32, palette, format);
+    index = applyPalette(data, palette, format);
   }
   console.profileEnd('applyPalette');
   console.timeEnd('applyPalette');

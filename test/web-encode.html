@@ -68,17 +68,14 @@
         // Get RGBA data from canvas
         const data = context.getImageData(0, 0, width, height).data;
 
-        // Wrap in a faster pixel access structure
-        const uint32 = new Uint32Array(data.buffer);
-
         // Choose a pixel format: rgba4444, rgb444, rgb565
         const format = "rgb444";
 
         // If necessary, quantize your colors to a reduced palette
-        const palette = quantize(uint32, 256, { format });
+        const palette = quantize(data, 256, { format });
 
         // Apply palette to RGBA data to get an indexed bitmap
-        const index = applyPalette(uint32, palette, format);
+        const index = applyPalette(data, palette, format);
 
         // Write frame into GIF
         gif.writeFrame(index, width, height, { palette, delay });

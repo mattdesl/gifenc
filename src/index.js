@@ -9,7 +9,7 @@ import {
   nearestColorIndex,
   nearestColor,
   nearestColorIndexWithDistance,
-  colorSnap,
+  snapColorsToPalette,
 } from "./palettize.js";
 
 function GIFEncoder(opt = {}) {
@@ -288,7 +288,7 @@ export {
   nearestColorIndex,
   nearestColor,
   nearestColorIndexWithDistance,
-  colorSnap,
+  snapColorsToPalette,
 };
 
 export default GIFEncoder;

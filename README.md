@@ -39,17 +39,11 @@ import { GIFEncoder, quantize, applyPalette } from 'https://unpkg.com/gifenc@1.0
 // Get your RGBA image into Uint8Array data, such as from canvas
 const { data, width, height } = /* ... getImageData() ... */;
 
-// Wrap RGBA in a typed buffer view for faster access
-const uint32 = new Uint32Array(data.buffer);
-
-// Choose a pixel format: rgba4444, rgb444, rgb565
-const format = "rgb444";
-
 // Quantize your colors to a 256-color RGB palette palette
-const palette = quantize(uint32, 256, { format });
+const palette = quantize(data, 256);
 
 // Get an indexed bitmap by reducing each pixel to the nearest color palette
-const index = applyPalette(uint32, palette);
+const index = applyPalette(data, palette);
 
 // Create an encoding stream
 const gif = GIFEncoder();
@@ -64,9 +58,136 @@ gif.finish();
 const output = gif.bytes();
 ```
 
-## Usage
+## API
 
-Documentation for this library is still being worked on. Come back later.
+> :bulb: If you are new to GIF encoding, you might want to read [How GIF Encoding Works](#how-gif-encoding-works) to better understand the steps involved.
+
+### `palette = quantize(rgba, maxColors, options = {})`
+
+Given the image contained by `rgba`, a flat `Uint8Array` or `Uint8ClampedArray` of per-pixel RGBA data, this method will quantize the total number of colors down to a reduced palette no greater than `maxColors`.
+
+Options:
+
+- `format` (string, default `"rgb565"`) — this is the color format, either `"rgb565"` (default), `"rgb444"`, or `"rgba4444"`
+  - 565 means 5 bits red, 6 bits green, 5 bits blue (better quality, slower)
+  - `rgb444` is 4 bits per channel (lower quality, faster)
+  - `rgba4444` is the same as above but with alpha support
+  - if you choose `rgba4444`, the resulting color table will include alpha channel
+- `oneBitAlpha` (boolean|number, default false) — if alpha format is selected, this will go through all quantized RGBA colors and set their alpha to either `0x00` if the alpha is less than or equal to `127`, otherwise it will be set to `0xFF`. You can specify a number here instead of a boolean to use a specific 1-bit alpha threshold
+- `clearAlpha` (boolean, default true) — if alpha format is selected and the quantized color is below `clearAlphaThreshold`, it will be replaced with `clearAlphaColor` (i.e. RGB colors with 0 opacity will be replaced with pure black)
+- `clearAlphaThreshold` (number, default 0) — if alpha and `clearAlpha` is enabled, and a quantized pixel has an alpha below or equal to this value, its RGB values will be set to `clearAlphaColor`
+- `clearAlphaColor` (number, default `0x00`) — if alpha and `clearAlpha` is enabled and a quantized pixel is being cleared, this is the color its RGB cahnnels will be cleared to (typically you will choose `0x00` or `0xff`)
+
+The return value `palette` is an array of arrays, and no greater than `maxColors` in length. Each array in the `palette` is either RGB or RGBA (depending on pixel format) such as `[ r, g, b ]` or `[ r, g, b, a ]` in bytes.
+
+### `index = applyPalette(rgba, palette, format = "rgb565")`
+
+This will determine the color index for each pixel in the `rgba` image. The pixel input is the same as the above function: to a flat `Uint8Array` or `Uint8ClampedArray` of per-pixel RGBA data.
+
+The method will step through each pixel and determine it's closest pixel in the color table (in euclidean RGB(A) space), and replace the pixel with an index value in the range 0..255. The return value `index` is a `Uint8Array` with a length equal to `rgba.length / 4` (i.e. 1 byte per pixel).
+
+The method uses `palette`, which is an array of arrays such as received from the `quantize` method, and may be in RGB or RGBA depending on your desired `format`.
+
+```js
+const palette = [
+  [ 0, 255, 10 ],
+  [ 50, 20, 100 ],
+  // ...
+];
+```
+
+The `format` is the same as in `quantize`, and you can choose between opaque (RGB) and semi-transparent (RGBA) formats. You'll likely want to choose the same format you used to quantize your image.
+
+### `gif = GIFEncoder(opts = {})`
+
+Creates a new GIF stream with the given options (for basic usage, you can ignore these).
+
+- `auto` (boolean, default true) — in "auto" mode, the header and first-frame metadata (global palette) will be written upon writing the first frame. If set to false, you will be responsible for first writing a GIF header, then writing frames with `{ first }` boolean specified.
+- `initialCapacity` (number, default 4096) — the number of bytes to initially set the internal buffer to, it will grow as bytes are written to the stream
+
+Once created:
+
+#### `gif.writeFrame(index, width, height, opts = {})`
+
+Writes a single frame into the GIF stream, with `index` (indexed Uint8Array bitmap image), a size, and optional per-frame options:
+
+- `palette` (color table array) — the color table for this frame, which is required for the first frame (i.e. global color table) but optional for subsequent frames. If not specified, the frame will use the first (global) color table in the stream.
+- `first` (boolean, default false) — in non-auto mode, set this to true when encoding the first frame in an image or sequence, and it will encode the Logical Screen Descriptor and a Global Color Table. This option is ignored in `auto` mode.
+- `transparent` (boolean, default false) — enable 1-bit transparency for this frame
+- `transparentIndex` (number, default 0) — if `transparency` is enabled, the color at the specified palette index will be treated as fully transparent for this frame
+- `delay` (number, default 0) — the frame delay in milliseconds
+- `repeat` (number, default 0) — repeat count, set to `-1` for 'once', `0` for 'forever', and any other positive integer for the number of repetitions
+- `dispose` (number, default -1) — advanced GIF dispose flag override, -1 is 'use default'
+
+#### `gif.finish()`
+
+Writes the GIF end-of-stream character, required after writing all frames for the image to encode correctly.
+
+#### `gif.bytes()`
+
+Gets a slice of the Uint8Array bytes that is underlying this GIF stream. (Note: this incurs a copy)
+
+#### `gif.bytesView()`
+
+Gets a direct typed array buffer view into the Uint8Array bytes underlying this GIF stream. (Note: no copy involved, but best to use this carefully).
+
+#### `gif.writeHeader()`
+
+Writes a GIF header into the stream, only necessary if you have specified `{ auto: false }` in the GIFEncoder options.
+
+#### `gif.reset()`
+
+Resets this GIF stream by simply setting its internal stream cursor (index) to zero, so that subsequent writes will replace the previous data in the underlying buffer.
+
+#### `gif.buffer`
+
+A property on the GIF stream that returns the currently backed `ArrayBuffer`, note this reference may change as the buffer grows in size.
+
+#### `gif.stream`
+
+A property on the GIF stream that returns an internal API that holds an expandable buffer and allows writing single or multiple bytes.
+
+```js
+// write a single byte to stream
+gif.stream.writeByte(0xff);
+// write a chunk of bytes to the stream
+gif.stream.writeBytes(myTypedArray, offset, byteLength);
+```
+
+### `index = nearestColorIndex(palette, pixel)`
+
+For the given `pixel` as `[r,g,b]` or `[r,g,b,a]` (depending on your pixel format), determines the index (0...N) of the nearest color in your `palette` array of colors in the same RGB(A) format.
+
+### `[index, distance] = nearestColorIndexWithDistance(palette, pixel)`
+
+Same as above, but returns a tuple of `index` and `distance` (euclidean distance squared).
+
+## Web Workers
+
+Currently there is no API or example for use with Web Workers, but there are a number of approaches that could be taken. The simplest, and the one used in my [Looom exporter](https://github.com/mattdesl/looom-tools/blob/dd04eb2985a8defec3dc9874600ca033bda5d96f/site/components/record.js#L250), is to:
+
+- Send the RGBA pixel data of each frame to one worker amongst a pool of multiple workers
+- In the worker, do quantization, apply palette, and then use `GIFEncoder({ auto: false })` to write a 'chunk' of GIF without a header or end-of-stream
+- Send the encoded bytes view back to the main thread, which will store the chunk into a linear array
+- Once all streams have been encoded and their workers responded with encoded chunks, you can write all frames sequentially into a single GIF stream
+
+(TODO: It would be good to have an example of this in the `test` folder!)
+
+## How GIF Encoding Works
+
+There are generally 3 steps involved, but some applications might be able to skip these or choose a different algorithm for one of the steps, so this library gives you control over each step.
+
+For each frame in your animation (or, just a single frame for still images):
+
+1. You'll first need to convert RGB(A) pixels from your source graphic/photograph into a reduced color table (palette) of 256 or less RGB colors. The act of reducing thousands of colors into 256 unique colors that still produce good quality results is known as *quantization*.
+2. Then, you'll need to turn your RGB(A) pixels into an *indexed bitmap*, basically going through each pixel and finding the nearest *index* into the color table for that pixel, based on our reduced palette. In `gifenc`, we call this *applying a palette*. The result of this is a bitmap image where each pixel is an index integer in the range 0..255 that points to a color in your palette.
+3. Now, we can *encode* this single frame by writing the indexed bitmap and local palette. This will compress the pixel data with GIF/LZW encoding, and add it to the GIF stream.
+
+There's some situations where you might need to change the way you approach these steps. For example, if you decide to use a single global 256-color palette for a whole animation, you might only need to *quantize* once, and then *applyPalette* to each frame by reducing to the same global palette. In some other cases, you might choose to add *prequantization* or *postquantization* to speed up and improve the quantization results, or perhaps skip steps #2 and #3 if you already have indexed images. Or, you might choose to use dithering, or perhaps another quantizer entirely.
+
+## More to Come
+
+This library is still a WIP, feel free to open an issue to discuss some things.
 
 ## Credits
 
