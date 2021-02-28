@@ -60,8 +60,7 @@ export function applyPalette(data, palette, format = "rgb565") {
       index[i] = idx;
     }
   } else {
-    const rgb888_to_key = format === "rgb444"
-      ? rgb888_to_rgb444 : rgb888_to_rgb565;
+    const rgb888_to_key = format === "rgb444" ? rgb888_to_rgb444 : rgb888_to_rgb565;
     for (let i = 0; i < data.length; i++) {
       const color = data[i];
       const b = (color >> 16) & 0xff;

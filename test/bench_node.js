@@ -3,7 +3,9 @@ const { promisify } = require("util");
 const getPixels = promisify(require("get-pixels"));
 const fs = require("fs");
 
+// NOTE: Uses the built version, not source!
 const { GIFEncoder, quantize, applyPalette } = require("../dist/gifenc");
+
 const N = 100;
 
 (async () => {

@@ -1,8 +1,11 @@
+// Note: Uses source version, not built version!
 import {
   GIFEncoder,
   applyPalette,
   quantize
 } from "../src/index.js";
+
+const N = 100;
 
 async function readImage(url) {
   const img = await loadImage(url);
@@ -23,14 +26,11 @@ async function loadImage(url) {
   });
 }
 
-const N = 100;
-
 (async () => {
   const { data, width, height } = await readImage(
     "/test/fixtures/007-transparent.png"
   );
 
-  // Wrap your RGBA uint8array into a uint32 array
   const uint32 = new Uint32Array(data.buffer);
   const format = 'rgb444';
 
