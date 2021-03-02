@@ -17,6 +17,8 @@
 </head>
 <body>
   <p>A fast GIF encoder in JavaScript, see <a href="https://github.com/mattdesl/gifenc">mattdesl/gifenc</a>.</p>
+  <p>This demo uses Worker Modules so it may only work in Chrome. This could be resolved with a bundler like Parcel or Webpack.</p>
+  <div id='progress'></div>
   <canvas></canvas>
   <script type='module'>
     import {
@@ -27,6 +29,8 @@
     // import {
     //   GIFEncoder, quantize, applyPalette
     // } from '/dist/gifenc.esm.js';
+
+    const workerUrl = '/test/worker.js';
 
     encode();
 
@@ -59,10 +63,19 @@
       const render = sketch();
       const frames = new Array(totalFrames).fill(0).map((_, i) => i);
 
-      // Setup an encoder that we will write frames into
-      const gif = GIFEncoder();
-
       console.time('encode');
+
+      // Setup an encoder that we will write frames into
+      const encoder = await createWorkerEncoder({
+        totalFrames,
+        fps,
+        width,
+        height,
+        progress (v) {
+          const el = document.querySelector('#progress');
+          el.textContent = `Progress: ${Math.round(v * 100)}%`;
+        }
+      });
 
       // We use for 'of' to loop with async await
       for (let i of frames) {
@@ -75,30 +88,133 @@
         // Get RGBA data from canvas
         const data = context.getImageData(0, 0, width, height).data;
 
-        // Choose a pixel format: rgba4444, rgb444, rgb565
-        const format = "rgb444";
-
-        // If necessary, quantize your colors to a reduced palette
-        const palette = quantize(data, 256, { format });
-
-        // Apply palette to RGBA data to get an indexed bitmap
-        const index = applyPalette(data, palette, format);
-
-        // Write frame into GIF
-        gif.writeFrame(index, width, height, { palette, delay });
+        // Send data to worker
+        encoder.addFrame(data, i);
 
         // Wait a tick so that we don't lock up browser
         await new Promise(resolve => setTimeout(resolve, 0));
       }
 
-      // Finalize stream
-      gif.finish();
+      // Now the main thread is available again for UI/rendering work...
+      console.log('Waiting for workers...')
 
+      // Get the resulting buffer
+      const buffer = await encoder.finish();
       console.timeEnd('encode');
-
-      // Get a direct typed array view into the buffer to avoid copying it
-      const buffer = gif.bytesView();
       download(buffer, 'animation.gif', { type: 'image/gif' });
+    }
+
+    async function createWorkerEncoder (opts = {}) {
+      const {
+        progress = (() => {}),
+        totalFrames,
+        width,
+        height,
+        fps = 30,
+        maxColors = 256,
+        workerCount = 4,
+        format = 'rgb444',
+      } = opts;
+
+      if (!totalFrames) throw new Error('Must specify totalFrames > 0');
+      if (!width || !height) throw new Error('Must specify { width, height }');
+
+      const workers = new Array(workerCount).fill(null).map(() => {
+        // Worker modules are Chrome-only at the time of writing
+        return new Worker(workerUrl, { type: 'module' });
+      });
+
+      const frames = new Array(totalFrames).fill(null);
+
+      const fpsInterval = 1 / fps;
+      const delay = fpsInterval * 1000;
+
+      let remaining = totalFrames;
+      let workerIndex = 0;
+
+      // First we send encoder options to each worker
+      workers.forEach(w => {
+        w.postMessage({
+          event: 'init',
+          repeat: 0,
+          delay,
+          maxColors,
+          width,
+          height,
+        })
+      });
+
+      // Then we wait for all workers to be ready
+      await Promise.all(workers.map(w => waitForReady(w)));
+
+      const gif = GIFEncoder({ auto: false });
+
+      return {
+        addFrame (data, frame) {
+          // We cycle through all workers uniformly
+          const worker = workers[(workerIndex++) % workers.length];
+          // Send data to worker
+          worker.postMessage([data, frame], [ data.buffer ]);
+          frames[frame] = waitForFrame(worker, frame).then(ev => {
+            const [ data, frame ] = ev.data;
+            nextProgress();
+            return data;
+          });
+        },
+
+        async finish () {
+          // Once all chunks are ready
+          const chunks = await Promise.all(frames);
+          
+          // Write the header first
+          gif.writeHeader();
+
+          // Now we can write each chunk
+          for (let i = 0; i < chunks.length; i++) {
+            gif.stream.writeBytesView(chunks[i]);
+          }
+
+          // Finish the GIF
+          gif.finish();
+
+          // Close workers
+          workers.forEach(w => w.terminate())
+          workers.length = 0;
+
+          // Return bytes
+          return gif.bytesView();
+        }
+      };
+
+      function nextProgress () {
+        remaining--;
+        const p = (totalFrames - remaining) / totalFrames;
+        progress(p);
+      }
+
+      function waitForReady (worker) {
+        return new Promise((resolve) => {
+          const handler = (ev) => {
+            if (ev.data === 'ready') {
+              worker.removeEventListener("message", handler);
+              resolve(ev);
+            }
+          };
+          worker.addEventListener("message", handler, { passive: true });
+        });
+      }
+
+      function waitForFrame(worker, frame) {
+        return new Promise((resolve) => {
+          const handler = (ev) => {
+            if (ev.data[1] === frame) {
+              worker.removeEventListener("message", handler);
+              resolve(ev);
+            }
+          };
+          worker.addEventListener("message", handler, { passive: true });
+        });
+      }
     }
 
     // This could be replaced with your own generative artwork...

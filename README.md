@@ -6,7 +6,7 @@ A fast and lightweight pure-JavaScript GIF encoder. Features:
 
 - Supports many standard GIF features: image, animation, transparency
 - Works in browser and Node.js (ESM + CJS)
-- Highly optimized for V8
+- Highly optimized for V8 (150 1024x1024px frames takes about 2.1 seconds with workers in Chrome)
 - Small library footprint (5KB before GZIP)
 - Can be used across multiple web workers for multi-core devices
 - Allows full control over encoding indexed bitmaps & per frame color palette
@@ -165,14 +165,21 @@ Same as above, but returns a tuple of `index` and `distance` (euclidean distance
 
 ## Web Workers
 
-Currently there is no API or example for use with Web Workers, but there are a number of approaches that could be taken. The simplest, and the one used in my [Looom exporter](https://github.com/mattdesl/looom-tools/blob/dd04eb2985a8defec3dc9874600ca033bda5d96f/site/components/record.js#L250), is to:
+For the best speed, you should use workers to split this work across multiple threads. Compare these encoding speeds with 150 frames of 1024x1024px GIF in Chrome:
+
+- Main thread only: ~6 seconds
+- Split across 4 workers: ~2 seconds
+
+This library will run fine in a worker with ES support, but there is currently no built-in worker API, and it's up to the developer to implement their own worker architecture and handle bundling.
+
+The simplest architecture, and the one used in my [Looom exporter](https://github.com/mattdesl/looom-tools/blob/dd04eb2985a8defec3dc9874600ca033bda5d96f/site/components/record.js#L250), is to:
 
 - Send the RGBA pixel data of each frame to one worker amongst a pool of multiple workers
 - In the worker, do quantization, apply palette, and then use `GIFEncoder({ auto: false })` to write a 'chunk' of GIF without a header or end-of-stream
 - Send the encoded bytes view back to the main thread, which will store the chunk into a linear array
 - Once all streams have been encoded and their workers responded with encoded chunks, you can write all frames sequentially into a single GIF stream
 
-(TODO: It would be good to have an example of this in the `test` folder!)
+There is an example of this in [./test/encode_web_workers.html](./test/encode_web_workers.html) which uses [./test/worker.js](./test/worker.js). Future versions of this library might include a pre-bundled worker API built-in for easier use.
 
 ## How GIF Encoding Works
 
@@ -216,7 +223,9 @@ Benchmarking/profiling is probably easier with Chrome, and this imports the sour
 npm run serve
 ```
 
-Now navigate to [http://localhost:5000/test/bench_web.html](http://localhost:5000/test/bench_web.html)
+Now navigate to [http://localhost:5000/test/bench_web.html](http://localhost:5000/test/bench_web.html).
+
+Similarly, while serving you can 
 
 ## More to Come
 
