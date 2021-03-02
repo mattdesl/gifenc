@@ -5,6 +5,7 @@
 A fast and lightweight pure-JavaScript GIF encoder. Features:
 
 - Supports many standard GIF features: image, animation, transparency
+- Works in browser and Node.js (ESM + CJS)
 - Highly optimized for V8
 - Small library footprint (5KB before GZIP)
 - Can be used across multiple web workers for multi-core devices
@@ -25,11 +26,11 @@ Some features that could be explored in a future version:
 
 ## Example
 
-You can see a simple example [here](https://codepen.io/mattdesl/full/vYypMXv).
+You can see a simple browser example [here](https://codepen.io/mattdesl/full/vYypMXv).
 
 You can see a more advanced example of this encoder in action inside [looom-tools.netlify.app](https://looom-tools.netlify.app/).
 
-Also see [./test/node-encode.js](./test/node-encode.js) for a pure Node.js example.
+Also see [./test/encode_node.js](./test/encode_node.js) for a pure Node.js example.
 
 Basic code example:
 
@@ -184,6 +185,38 @@ For each frame in your animation (or, just a single frame for still images):
 3. Now, we can *encode* this single frame by writing the indexed bitmap and local palette. This will compress the pixel data with GIF/LZW encoding, and add it to the GIF stream.
 
 There's some situations where you might need to change the way you approach these steps. For example, if you decide to use a single global 256-color palette for a whole animation, you might only need to *quantize* once, and then *applyPalette* to each frame by reducing to the same global palette. In some other cases, you might choose to add *prequantization* or *postquantization* to speed up and improve the quantization results, or perhaps skip steps #2 and #3 if you already have indexed images. Or, you might choose to use dithering, or perhaps another quantizer entirely.
+
+## Running from Source
+
+Git clone this repo, then:
+
+```sh
+npm install
+```
+
+To run the node test:
+
+```sh
+node test/encode_node.js
+```
+
+And check `test/output/` folder for the result. Or to benchmark with node:
+
+```sh
+# re-build from source
+npm run dist:cjs
+
+# run benchmark
+node test/bench_node.js
+```
+
+Benchmarking/profiling is probably easier with Chrome, and this imports the source directly rather than built version:
+
+```sh
+npm run serve
+```
+
+Now navigate to [http://localhost:5000/test/bench_web.html](http://localhost:5000/test/bench_web.html)
 
 ## More to Come
 
