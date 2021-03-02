@@ -12,10 +12,6 @@ import {
   rgba8888_to_rgba4444,
 } from "./rgb-packing.js";
 
-function clamp(value, min, max) {
-  return value < min ? min : value > max ? max : value;
-}
-
 function sqr(value) {
   return value * value;
 }
@@ -24,30 +20,31 @@ function find_nn(bins, idx, hasAlpha) {
   var nn = 0;
   var err = 1e100;
 
-  var bin1 = bins[idx];
-  var n1 = bin1.cnt;
-  var wa = bin1.ac;
-  var wr = bin1.rc;
-  var wg = bin1.gc;
-  var wb = bin1.bc;
+  const bin1 = bins[idx];
+  const n1 = bin1.cnt;
+  const wa = bin1.ac;
+  const wr = bin1.rc;
+  const wg = bin1.gc;
+  const wb = bin1.bc;
   for (var i = bin1.fw; i != 0; i = bins[i].fw) {
-    var n2 = bins[i].cnt,
-      nerr2 = (n1 * n2) / (n1 + n2);
+    const bin = bins[i];
+    const n2 = bin.cnt;
+    const nerr2 = (n1 * n2) / (n1 + n2);
     if (nerr2 >= err) continue;
 
     var nerr = 0;
     if (hasAlpha) {
-      nerr += nerr2 * sqr(bins[i].ac - wa);
+      nerr += nerr2 * sqr(bin.ac - wa);
       if (nerr >= err) continue;
     }
 
-    nerr += nerr2 * sqr(bins[i].rc - wr);
+    nerr += nerr2 * sqr(bin.rc - wr);
     if (nerr >= err) continue;
 
-    nerr += nerr2 * sqr(bins[i].gc - wg);
+    nerr += nerr2 * sqr(bin.gc - wg);
     if (nerr >= err) continue;
 
-    nerr += nerr2 * sqr(bins[i].bc - wb);
+    nerr += nerr2 * sqr(bin.bc - wb);
     if (nerr >= err) continue;
     err = nerr;
     nn = i;
@@ -56,36 +53,13 @@ function find_nn(bins, idx, hasAlpha) {
   bin1.nn = nn;
 }
 
-function create_bin() {
-  return {
-    ac: 0,
-    rc: 0,
-    gc: 0,
-    bc: 0,
-    cnt: 0,
-    nn: 0,
-    fw: 0,
-    bk: 0,
-    tm: 0,
-    mtm: 0,
-    err: 0,
-  };
-}
-
-function bin_add_rgb(bin, r, g, b) {
-  bin.rc += r;
-  bin.gc += g;
-  bin.bc += b;
-  bin.cnt++;
-}
-
 function create_bin_list(data, format) {
   const bincount = format === "rgb444" ? 4096 : 65536;
   const bins = new Array(bincount);
   const size = data.length;
 
   /* Build histogram */
-  // Note: Instead of introducing branching/conditions
+  // Note: Instead of introducing branching/conditions and function calls
   // within a very hot per-pixel iteration, we just duplicate the code
   // for each new condition
   if (format === "rgba4444") {
@@ -98,38 +72,48 @@ function create_bin_list(data, format) {
 
       // reduce to rgb4444 16-bit uint
       const index = rgba8888_to_rgba4444(r, g, b, a);
-      let bin = index in bins ? bins[index] : (bins[index] = create_bin());
+      const bin = index in bins ? bins[index] : (bins[index] = {
+        ac: 0,
+        rc: 0,
+        gc: 0,
+        bc: 0,
+        cnt: 0,
+        nn: 0,
+        fw: 0,
+        bk: 0,
+        tm: 0,
+        mtm: 0,
+        err: 0,
+      });
       bin.rc += r;
       bin.gc += g;
       bin.bc += b;
       bin.ac += a;
       bin.cnt++;
     }
-  } else if (format === "rgb444") {
-    for (let i = 0; i < size; ++i) {
-      const color = data[i];
-      const b = (color >> 16) & 0xff;
-      const g = (color >> 8) & 0xff;
-      const r = color & 0xff;
-
-      // reduce to rgb444 12-bit uint
-      const index = rgb888_to_rgb444(r, g, b);
-      let bin = index in bins ? bins[index] : (bins[index] = create_bin());
-      bin.rc += r;
-      bin.gc += g;
-      bin.bc += b;
-      bin.cnt++;
-    }
   } else {
+    const rgb888_to_key = format === "rgb444" ? rgb888_to_rgb444 : rgb888_to_rgb565;
     for (let i = 0; i < size; ++i) {
       const color = data[i];
       const b = (color >> 16) & 0xff;
       const g = (color >> 8) & 0xff;
       const r = color & 0xff;
 
-      // reduce to rgb565 16-bit uint
-      const index = rgb888_to_rgb565(r, g, b);
-      let bin = index in bins ? bins[index] : (bins[index] = create_bin());
+      // reduce to rgb444 12-bit uint or rgb565 16-bit uint key
+      const index = rgb888_to_key(r, g, b);
+      const bin = index in bins ? bins[index] : (bins[index] = {
+        ac: 0,
+        rc: 0,
+        gc: 0,
+        bc: 0,
+        cnt: 0,
+        nn: 0,
+        fw: 0,
+        bk: 0,
+        tm: 0,
+        mtm: 0,
+        err: 0,
+      });
       bin.rc += r;
       bin.gc += g;
       bin.bc += b;
@@ -172,7 +156,7 @@ export default function quantize(rgba, maxColors, opts) {
 
   /* Cluster nonempty bins at one end of array */
   var maxbins = 0;
-  for (var i = 0; i < bins.length; ++i) {
+  for (var i = 0; i < bincount; ++i) {
     const bin = bins[i];
     if (bin != null) {
       var d = 1.0 / bin.cnt;
@@ -187,9 +171,7 @@ export default function quantize(rgba, maxColors, opts) {
   if (sqr(maxColors) / maxbins < 0.022) {
     useSqrt = false;
   }
-
-  var i = 0;
-  for (; i < maxbins - 1; ++i) {
+  for (i = 1; i < maxbins - 1; ++i) {
     bins[i].fw = i + 1;
     bins[i + 1].bk = i;
     if (useSqrt) bins[i].cnt = Math.sqrt(bins[i].cnt);
@@ -258,44 +240,42 @@ export default function quantize(rgba, maxColors, opts) {
   let palette = [];
 
   /* Fill palette */
-  var k = 0;
-  for (i = 0; ; ++k) {
-    let r = clamp(Math.round(bins[i].rc), 0, 0xff);
-    let g = clamp(Math.round(bins[i].gc), 0, 0xff);
-    let b = clamp(Math.round(bins[i].bc), 0, 0xff);
+  const threshold = typeof oneBitAlpha === "number" ? oneBitAlpha : 127;
+  let color;
+  if (hasAlpha) {
+    for (i = 0; ; ) {
+      const bin = bins[i];
+      const r = Math.round(bin.rc);
+      const g = Math.round(bin.gc);
+      const b = Math.round(bin.bc);
 
-    let a = 0xff;
-    if (hasAlpha) {
-      a = clamp(Math.round(bins[i].ac), 0, 0xff);
+      let a = Math.round(bin.ac);
       if (oneBitAlpha) {
-        const threshold = typeof oneBitAlpha === "number" ? oneBitAlpha : 127;
         a = a <= threshold ? 0x00 : 0xff;
       }
       if (clearAlpha && a <= clearAlphaThreshold) {
-        r = g = b = clearAlphaColor;
-        a = 0x00;
+        color = [clearAlphaColor, clearAlphaColor, clearAlphaColor, 0x00];
+      } else {
+        color = [r, g, b, a];
       }
-    }
 
-    const color = hasAlpha ? [r, g, b, a] : [r, g, b];
-    const exists = existsInPalette(palette, color);
-    if (!exists) palette.push(color);
-    if ((i = bins[i].fw) == 0) break;
+      if (palette.indexOf(color) === -1) palette.push(color);
+      if ((i = bin.fw) == 0) break;
+    }
+  } else {
+    for (i = 0; ; ) {
+      const bin = bins[i];
+      const r = Math.round(bin.rc);
+      const g = Math.round(bin.gc);
+      const b = Math.round(bin.bc);
+      const color = [r, g, b];
+
+      if (palette.indexOf(color) === -1) palette.push(color);
+      if ((i = bin.fw) == 0) break;
+    }
   }
 
   return palette;
-}
-
-function existsInPalette(palette, color) {
-  for (let i = 0; i < palette.length; i++) {
-    const p = palette[i];
-    let matchesRGB =
-      p[0] === color[0] && p[1] === color[1] && p[2] === color[2];
-    let matchesAlpha =
-      p.length >= 4 && color.length >= 4 ? p[3] === color[3] : true;
-    if (matchesRGB && matchesAlpha) return true;
-  }
-  return false;
 }
 
 // TODO: Further 'clean' palette by merging nearly-identical colors?
