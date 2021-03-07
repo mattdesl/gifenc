@@ -24,30 +24,31 @@ function find_nn(bins, idx, hasAlpha) {
   var nn = 0;
   var err = 1e100;
 
-  var bin1 = bins[idx];
-  var n1 = bin1.cnt;
-  var wa = bin1.ac;
-  var wr = bin1.rc;
-  var wg = bin1.gc;
-  var wb = bin1.bc;
+  const bin1 = bins[idx];
+  const n1 = bin1.cnt;
+  const wa = bin1.ac;
+  const wr = bin1.rc;
+  const wg = bin1.gc;
+  const wb = bin1.bc;
   for (var i = bin1.fw; i != 0; i = bins[i].fw) {
-    var n2 = bins[i].cnt,
-      nerr2 = (n1 * n2) / (n1 + n2);
+    const bin = bins[i];
+    const n2 = bin.cnt;
+    const nerr2 = (n1 * n2) / (n1 + n2);
     if (nerr2 >= err) continue;
 
     var nerr = 0;
     if (hasAlpha) {
-      nerr += nerr2 * sqr(bins[i].ac - wa);
+      nerr += nerr2 * sqr(bin.ac - wa);
       if (nerr >= err) continue;
     }
 
-    nerr += nerr2 * sqr(bins[i].rc - wr);
+    nerr += nerr2 * sqr(bin.rc - wr);
     if (nerr >= err) continue;
 
-    nerr += nerr2 * sqr(bins[i].gc - wg);
+    nerr += nerr2 * sqr(bin.gc - wg);
     if (nerr >= err) continue;
 
-    nerr += nerr2 * sqr(bins[i].bc - wb);
+    nerr += nerr2 * sqr(bin.bc - wb);
     if (nerr >= err) continue;
     err = nerr;
     nn = i;
@@ -105,7 +106,9 @@ function create_bin_list(data, format) {
       bin.ac += a;
       bin.cnt++;
     }
-  } else if (format === "rgb444") {
+  }
+  
+  else if (format === "rgb444") {
     for (let i = 0; i < size; ++i) {
       const color = data[i];
       const b = (color >> 16) & 0xff;
@@ -172,7 +175,7 @@ export default function quantize(rgba, maxColors, opts = {}) {
 
   /* Cluster nonempty bins at one end of array */
   var maxbins = 0;
-  for (var i = 0; i < bins.length; ++i) {
+  for (var i = 0; i < bincount; ++i) {
     const bin = bins[i];
     if (bin != null) {
       var d = 1.0 / bin.cnt;
