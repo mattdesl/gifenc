@@ -7,7 +7,7 @@ A fast and lightweight pure-JavaScript GIF encoder. Features:
 - Supports many standard GIF features: image, animation, transparency
 - Works in browser and Node.js (ESM + CJS)
 - Highly optimized for V8 (150 1024x1024px frames takes about 2.1 seconds with workers in Chrome)
-- Small library footprint (5KB before GZIP)
+- Small library footprint (9KB before GZIP)
 - Can be used across multiple web workers for multi-core devices
 - Allows full control over encoding indexed bitmaps & per frame color palette
 - Fast built-in color quantizer based on a port of PnnQuant.js, which is based on "Pairwise Nearest Neighbor Clustering" [1](https://pdfs.semanticscholar.org/68b4/236e77d6026943ffa009d8b3553ace09a922.pdf) [2](https://github.com/mcychan/PnnQuant.js) [3](https://github.com/mcychan/nQuant.j2se)
