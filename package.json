@@ -1,6 +1,6 @@
 {
   "name": "gifenc",
-  "version": "1.0.1",
+  "version": "1.0.3",
   "description": "very fast JS GIF encoder",
   "main": "./dist/gifenc.js",
   "browser": "./dist/gifenc.js",

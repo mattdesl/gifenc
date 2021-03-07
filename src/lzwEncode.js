@@ -17,6 +17,7 @@
   James A. Woods (decvax!ihnp4!ames!jaw)
   Joe Orost (decvax!vax135!petsd!joe)
   Matt DesLauriers (@mattdesl - V8/JS optimizations)
+  Mathieu Henri (@p01 - JS optimization)
 */
 
 import createStream from "./stream.js";
@@ -49,22 +50,17 @@ function lzwEncode(
   height,
   pixels,
   colorDepth,
-  outStream,
-  accum,
-  htab,
-  codetab
+  outStream = createStream(512),
+  accum = new Uint8Array(256),
+  htab = new Int32Array(DEFAULT_HSIZE),
+  codetab = new Int32Array(DEFAULT_HSIZE)
 ) {
-  outStream = outStream || createStream(512);
-  accum = accum || new Uint8Array(256);
-  htab = htab || new Int32Array(DEFAULT_HSIZE);
-  codetab = codetab || new Int32Array(DEFAULT_HSIZE);
-
   const hsize = htab.length;
   const initCodeSize = Math.max(2, colorDepth);
 
   accum.fill(0);
   codetab.fill(0);
-  clear_hash();
+  htab.fill(-1);
 
   let cur_accum = 0;
   let cur_bits = 0;
@@ -93,7 +89,7 @@ function lzwEncode(
   // and compression rate changes, start over.
   let clear_flg = false;
   let n_bits = g_init_bits;
-  let maxcode = MAXCODE(n_bits);
+  let maxcode = (1 << n_bits) - 1;
 
   const ClearCode = 1 << (init_bits - 1);
   const EOFCode = ClearCode + 1;
@@ -112,8 +108,41 @@ function lzwEncode(
 
   output(ClearCode);
 
-  for (let idx = 1; idx < pixels.length; idx++) {
-    inner(pixels[idx]);
+  const length = pixels.length;
+  for (let idx = 1; idx < length; idx++) {
+    next_block: {
+      const c = pixels[idx];
+      const fcode = (c << BITS) + ent;
+      let i = (c << hshift) ^ ent; // xor hashing
+      if (htab[i] === fcode) {
+        ent = codetab[i];
+        break next_block;
+      }
+
+      const disp = i === 0 ? 1 : hsize - i; // secondary hash (after G. Knott)
+      while (htab[i] >= 0) {
+        // non-empty slot
+        i -= disp;
+        if (i < 0) i += hsize;
+        if (htab[i] === fcode) {
+          ent = codetab[i];
+          break next_block;
+        }
+      }
+      output(ent);
+      ent = c;
+      if (free_ent < 1 << BITS) {
+        codetab[i] = free_ent++; // code -> hashtable
+        htab[i] = fcode;
+      } else {
+        // Clear out the hash table
+        // table clear for block compress
+        htab.fill(-1);
+        free_ent = ClearCode + 2;
+        clear_flg = true;
+        output(ClearCode);
+      }
+    }
   }
 
   // Put out the final code.
@@ -122,69 +151,6 @@ function lzwEncode(
 
   outStream.writeByte(0); // write block terminator
   return outStream.bytesView();
-
-  // Add a character to the end of the current packet, and if it is 254
-  // characters, flush the packet to disk.
-  function char_out(c) {
-    accum[a_count++] = c;
-    if (a_count >= 254) flush_char();
-  }
-
-  // Clear out the hash table
-  // table clear for block compress
-  function clear_block() {
-    clear_hash();
-    free_ent = ClearCode + 2;
-    clear_flg = true;
-    output(ClearCode);
-  }
-
-  // Reset code table
-  function clear_hash() {
-    htab.fill(-1);
-  }
-
-  function inner(c) {
-    const fcode = (c << BITS) + ent;
-    let i = (c << hshift) ^ ent; // xor hashing
-    if (htab[i] === fcode) {
-      ent = codetab[i];
-    } else {
-      if (htab[i] >= 0) {
-        // non-empty slot
-        const disp = i === 0 ? 1 : hsize - i; // secondary hash (after G. Knott)
-        do {
-          i -= disp;
-          if (i < 0) i += hsize;
-          if (htab[i] === fcode) {
-            ent = codetab[i];
-            return;
-          }
-        } while (htab[i] >= 0);
-      }
-      output(ent);
-      ent = c;
-      if (free_ent < 1 << BITS) {
-        codetab[i] = free_ent++; // code -> hashtable
-        htab[i] = fcode;
-      } else {
-        clear_block();
-      }
-    }
-  }
-
-  // Flush the packet to disk, and reset the accumulator
-  function flush_char() {
-    if (a_count > 0) {
-      outStream.writeByte(a_count);
-      outStream.writeBytesView(accum, 0, a_count);
-      a_count = 0;
-    }
-  }
-
-  function MAXCODE(n_bits) {
-    return (1 << n_bits) - 1;
-  }
 
   function output(code) {
     cur_accum &= MASKS[cur_bits];
@@ -195,7 +161,14 @@ function lzwEncode(
     cur_bits += n_bits;
 
     while (cur_bits >= 8) {
-      char_out(cur_accum & 0xff);
+      // Add a character to the end of the current packet, and if it is 254
+      // characters, flush the packet to disk.
+      accum[a_count++] = cur_accum & 0xff;
+      if (a_count >= 254) {
+        outStream.writeByte(a_count);
+        outStream.writeBytesView(accum, 0, a_count);
+        a_count = 0;
+      }
       cur_accum >>= 8;
       cur_bits -= 8;
     }
@@ -205,23 +178,34 @@ function lzwEncode(
     if (free_ent > maxcode || clear_flg) {
       if (clear_flg) {
         n_bits = g_init_bits;
-        maxcode = MAXCODE(n_bits);
+        maxcode = (1 << n_bits) - 1;
         clear_flg = false;
       } else {
         ++n_bits;
-        if (n_bits == BITS) maxcode = 1 << BITS;
-        else maxcode = MAXCODE(n_bits);
+        maxcode = n_bits === BITS ? (1 << n_bits) : (1 << n_bits) - 1;
       }
     }
 
     if (code == EOFCode) {
       // At EOF, write the rest of the buffer.
       while (cur_bits > 0) {
-        char_out(cur_accum & 0xff);
+        // Add a character to the end of the current packet, and if it is 254
+        // characters, flush the packet to disk.
+        accum[a_count++] = cur_accum & 0xff;
+        if (a_count >= 254) {
+          outStream.writeByte(a_count);
+          outStream.writeBytesView(accum, 0, a_count);
+          a_count = 0;
+        }
         cur_accum >>= 8;
         cur_bits -= 8;
       }
-      flush_char();
+      // Flush the packet to disk, and reset the accumulator
+      if (a_count > 0) {
+        outStream.writeByte(a_count);
+        outStream.writeBytesView(accum, 0, a_count);
+        a_count = 0;
+      }
     }
   }
 }

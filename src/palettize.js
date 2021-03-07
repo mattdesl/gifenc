@@ -47,56 +47,39 @@ export function applyPalette(rgba, palette, format = "rgb565") {
   }
 
   const data = new Uint32Array(rgba.buffer);
+  const length = data.length;
   const bincount = format === "rgb444" ? 4096 : 65536;
-  const index = new Uint8Array(data.length);
+  const index = new Uint8Array(length);
   const cache = new Array(bincount);
   const hasAlpha = format === "rgba4444";
 
   // Some duplicate code below due to very hot code path
   // Introducing branching/conditions shows some significant impact
   if (format === "rgba4444") {
-    for (let i = 0; i < data.length; i++) {
+    for (let i = 0; i < length; i++) {
       const color = data[i];
       const a = (color >> 24) & 0xff;
       const b = (color >> 16) & 0xff;
       const g = (color >> 8) & 0xff;
       const r = color & 0xff;
       const key = rgba8888_to_rgba4444(r, g, b, a);
-      let idx;
-      if (cache[key] != null) {
-        idx = cache[key];
-      } else {
-        idx = nearestColorIndexRGBA(r, g, b, a, palette);
-        cache[key] = idx;
-      }
+      const idx = key in cache ? cache[key] : (cache[key] = nearestColorIndexRGBA(r, g, b, a, palette));
       index[i] = idx;
     }
   } else {
     const rgb888_to_key = format === "rgb444" ? rgb888_to_rgb444 : rgb888_to_rgb565;
-    for (let i = 0; i < data.length; i++) {
+    for (let i = 0; i < length; i++) {
       const color = data[i];
       const b = (color >> 16) & 0xff;
       const g = (color >> 8) & 0xff;
       const r = color & 0xff;
       const key = rgb888_to_key(r, g, b);
-      let idx;
-      if (cache[key] != null) {
-        idx = cache[key];
-      } else {
-        idx = nearestColorIndexRGB(r, g, b, palette);
-        cache[key] = idx;
-      }
+      const idx = key in cache ? cache[key] : (cache[key] = nearestColorIndexRGB(r, g, b, palette));
       index[i] = idx;
     }
   }
 
   return index;
-}
-
-function to_key(r, g, b, a, format) {
-  if (format === "rgba4444") return rgba8888_to_rgba4444(r, g, b, a);
-  else if (format === "rgb444") return rgb888_to_rgb444(r, g, b);
-  else return rgb888_to_rgb565(r, g, b);
 }
 
 function nearestColorIndexRGBA(r, g, b, a, palette) {

@@ -123,14 +123,14 @@ function create_bin_list(data, format) {
   return bins;
 }
 
-export default function quantize(rgba, maxColors, opts) {
+export default function quantize(rgba, maxColors, opts = {}) {
   const {
     format = "rgb565",
     clearAlpha = true,
     clearAlphaColor = 0x00,
     clearAlphaThreshold = 0,
     oneBitAlpha = false,
-  } = opts || {};
+  } = opts;
 
   if (!rgba || !rgba.buffer) {
     throw new Error('quantize() expected RGBA Uint8Array data');

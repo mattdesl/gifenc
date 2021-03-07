@@ -7,7 +7,7 @@ A fast and lightweight pure-JavaScript GIF encoder. Features:
 - Supports many standard GIF features: image, animation, transparency
 - Works in browser and Node.js (ESM + CJS)
 - Highly optimized for V8 (150 1024x1024px frames takes about 2.1 seconds with workers in Chrome)
-- Small library footprint (5KB before GZIP)
+- Small library footprint (9KB before GZIP)
 - Can be used across multiple web workers for multi-core devices
 - Allows full control over encoding indexed bitmaps & per frame color palette
 - Fast built-in color quantizer based on a port of PnnQuant.js, which is based on "Pairwise Nearest Neighbor Clustering" [1](https://pdfs.semanticscholar.org/68b4/236e77d6026943ffa009d8b3553ace09a922.pdf) [2](https://github.com/mcychan/PnnQuant.js) [3](https://github.com/mcychan/nQuant.j2se)
@@ -35,7 +35,7 @@ Also see [./test/encode_node.js](./test/encode_node.js) for a pure Node.js examp
 Basic code example:
 
 ```js
-import { GIFEncoder, quantize, applyPalette } from 'https://unpkg.com/gifenc@1.0.1';
+import { GIFEncoder, quantize, applyPalette } from 'https://unpkg.com/gifenc';
 
 // Get your RGBA image into Uint8Array data, such as from canvas
 const { data, width, height } = /* ... getImageData() ... */;
@@ -167,7 +167,7 @@ Same as above, but returns a tuple of `index` and `distance` (euclidean distance
 
 For the best speed, you should use workers to split this work across multiple threads. Compare these encoding speeds with 150 frames of 1024x1024px GIF in Chrome:
 
-- Main thread only: ~6 seconds
+- Main thread only: ~5 seconds
 - Split across 4 workers: ~2 seconds
 
 This library will run fine in a worker with ES support, but there is currently no built-in worker API, and it's up to the developer to implement their own worker architecture and handle bundling.

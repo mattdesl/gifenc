@@ -116,23 +116,19 @@ var MASKS = [
   32767,
   65535
 ];
-function lzwEncode(width, height, pixels, colorDepth, outStream, accum, htab, codetab) {
-  outStream = outStream || createStream(512);
-  accum = accum || new Uint8Array(256);
-  htab = htab || new Int32Array(DEFAULT_HSIZE);
-  codetab = codetab || new Int32Array(DEFAULT_HSIZE);
+function lzwEncode(width, height, pixels, colorDepth, outStream = createStream(512), accum = new Uint8Array(256), htab = new Int32Array(DEFAULT_HSIZE), codetab = new Int32Array(DEFAULT_HSIZE)) {
   const hsize = htab.length;
   const initCodeSize = Math.max(2, colorDepth);
   accum.fill(0);
   codetab.fill(0);
-  clear_hash();
+  htab.fill(-1);
   let cur_accum = 0;
   let cur_bits = 0;
   const init_bits = initCodeSize + 1;
   const g_init_bits = init_bits;
   let clear_flg = false;
   let n_bits = g_init_bits;
-  let maxcode = MAXCODE(n_bits);
+  let maxcode = (1 << n_bits) - 1;
   const ClearCode = 1 << init_bits - 1;
   const EOFCode = ClearCode + 1;
   let free_ent = ClearCode + 2;
@@ -145,44 +141,25 @@ function lzwEncode(width, height, pixels, colorDepth, outStream, accum, htab, co
   hshift = 8 - hshift;
   outStream.writeByte(initCodeSize);
   output(ClearCode);
-  for (let idx = 1; idx < pixels.length; idx++) {
-    inner(pixels[idx]);
-  }
-  output(ent);
-  output(EOFCode);
-  outStream.writeByte(0);
-  return outStream.bytesView();
-  function char_out(c) {
-    accum[a_count++] = c;
-    if (a_count >= 254)
-      flush_char();
-  }
-  function clear_block() {
-    clear_hash();
-    free_ent = ClearCode + 2;
-    clear_flg = true;
-    output(ClearCode);
-  }
-  function clear_hash() {
-    htab.fill(-1);
-  }
-  function inner(c) {
-    const fcode = (c << BITS) + ent;
-    let i = c << hshift ^ ent;
-    if (htab[i] === fcode) {
-      ent = codetab[i];
-    } else {
-      if (htab[i] >= 0) {
-        const disp = i === 0 ? 1 : hsize - i;
-        do {
-          i -= disp;
-          if (i < 0)
-            i += hsize;
-          if (htab[i] === fcode) {
-            ent = codetab[i];
-            return;
-          }
-        } while (htab[i] >= 0);
+  const length = pixels.length;
+  for (let idx = 1; idx < length; idx++) {
+    next_block: {
+      const c = pixels[idx];
+      const fcode = (c << BITS) + ent;
+      let i = c << hshift ^ ent;
+      if (htab[i] === fcode) {
+        ent = codetab[i];
+        break next_block;
+      }
+      const disp = i === 0 ? 1 : hsize - i;
+      while (htab[i] >= 0) {
+        i -= disp;
+        if (i < 0)
+          i += hsize;
+        if (htab[i] === fcode) {
+          ent = codetab[i];
+          break next_block;
+        }
       }
       output(ent);
       ent = c;
@@ -190,20 +167,17 @@ function lzwEncode(width, height, pixels, colorDepth, outStream, accum, htab, co
         codetab[i] = free_ent++;
         htab[i] = fcode;
       } else {
-        clear_block();
+        htab.fill(-1);
+        free_ent = ClearCode + 2;
+        clear_flg = true;
+        output(ClearCode);
       }
     }
   }
-  function flush_char() {
-    if (a_count > 0) {
-      outStream.writeByte(a_count);
-      outStream.writeBytesView(accum, 0, a_count);
-      a_count = 0;
-    }
-  }
-  function MAXCODE(n_bits2) {
-    return (1 << n_bits2) - 1;
-  }
+  output(ent);
+  output(EOFCode);
+  outStream.writeByte(0);
+  return outStream.bytesView();
   function output(code) {
     cur_accum &= MASKS[cur_bits];
     if (cur_bits > 0)
@@ -212,30 +186,41 @@ function lzwEncode(width, height, pixels, colorDepth, outStream, accum, htab, co
       cur_accum = code;
     cur_bits += n_bits;
     while (cur_bits >= 8) {
-      char_out(cur_accum & 255);
+      accum[a_count++] = cur_accum & 255;
+      if (a_count >= 254) {
+        outStream.writeByte(a_count);
+        outStream.writeBytesView(accum, 0, a_count);
+        a_count = 0;
+      }
       cur_accum >>= 8;
       cur_bits -= 8;
     }
     if (free_ent > maxcode || clear_flg) {
       if (clear_flg) {
         n_bits = g_init_bits;
-        maxcode = MAXCODE(n_bits);
+        maxcode = (1 << n_bits) - 1;
         clear_flg = false;
       } else {
         ++n_bits;
-        if (n_bits == BITS)
-          maxcode = 1 << BITS;
-        else
-          maxcode = MAXCODE(n_bits);
+        maxcode = n_bits === BITS ? 1 << n_bits : (1 << n_bits) - 1;
       }
     }
     if (code == EOFCode) {
       while (cur_bits > 0) {
-        char_out(cur_accum & 255);
+        accum[a_count++] = cur_accum & 255;
+        if (a_count >= 254) {
+          outStream.writeByte(a_count);
+          outStream.writeBytesView(accum, 0, a_count);
+          a_count = 0;
+        }
         cur_accum >>= 8;
         cur_bits -= 8;
       }
-      flush_char();
+      if (a_count > 0) {
+        outStream.writeByte(a_count);
+        outStream.writeBytesView(accum, 0, a_count);
+        a_count = 0;
+      }
     }
   }
 }
@@ -262,29 +247,31 @@ function sqr(value) {
 function find_nn(bins, idx, hasAlpha) {
   var nn = 0;
   var err = 1e100;
-  var bin1 = bins[idx];
-  var n1 = bin1.cnt;
-  var wa = bin1.ac;
-  var wr = bin1.rc;
-  var wg = bin1.gc;
-  var wb = bin1.bc;
+  const bin1 = bins[idx];
+  const n1 = bin1.cnt;
+  const wa = bin1.ac;
+  const wr = bin1.rc;
+  const wg = bin1.gc;
+  const wb = bin1.bc;
   for (var i = bin1.fw; i != 0; i = bins[i].fw) {
-    var n2 = bins[i].cnt, nerr2 = n1 * n2 / (n1 + n2);
+    const bin = bins[i];
+    const n2 = bin.cnt;
+    const nerr2 = n1 * n2 / (n1 + n2);
     if (nerr2 >= err)
       continue;
     var nerr = 0;
     if (hasAlpha) {
-      nerr += nerr2 * sqr(bins[i].ac - wa);
+      nerr += nerr2 * sqr(bin.ac - wa);
       if (nerr >= err)
         continue;
     }
-    nerr += nerr2 * sqr(bins[i].rc - wr);
+    nerr += nerr2 * sqr(bin.rc - wr);
     if (nerr >= err)
       continue;
-    nerr += nerr2 * sqr(bins[i].gc - wg);
+    nerr += nerr2 * sqr(bin.gc - wg);
     if (nerr >= err)
       continue;
-    nerr += nerr2 * sqr(bins[i].bc - wb);
+    nerr += nerr2 * sqr(bin.bc - wb);
     if (nerr >= err)
       continue;
     err = nerr;
@@ -356,14 +343,14 @@ function create_bin_list(data, format) {
   }
   return bins;
 }
-function quantize(rgba, maxColors, opts) {
+function quantize(rgba, maxColors, opts = {}) {
   const {
     format = "rgb565",
     clearAlpha = true,
     clearAlphaColor = 0,
     clearAlphaThreshold = 0,
     oneBitAlpha = false
-  } = opts || {};
+  } = opts;
   if (!rgba || !rgba.buffer) {
     throw new Error("quantize() expected RGBA Uint8Array data");
   }
@@ -378,7 +365,7 @@ function quantize(rgba, maxColors, opts) {
   const bincountMinusOne = bincount - 1;
   const heap = new Uint32Array(bincount + 1);
   var maxbins = 0;
-  for (var i = 0; i < bins.length; ++i) {
+  for (var i = 0; i < bincount; ++i) {
     const bin = bins[i];
     if (bin != null) {
       var d = 1 / bin.cnt;
@@ -506,7 +493,8 @@ function euclideanDistanceSquared(a, b) {
 function roundStep(byte, step) {
   return step > 1 ? Math.round(byte / step) * step : byte;
 }
-function prequantize(data, {roundRGB = 5, roundAlpha = 10, oneBitAlpha = null} = {}) {
+function prequantize(rgba, {roundRGB = 5, roundAlpha = 10, oneBitAlpha = null} = {}) {
+  const data = new Uint32Array(rgba.buffer);
   for (let i = 0; i < data.length; i++) {
     const color = data[i];
     let a = color >> 24 & 255;
@@ -531,43 +519,35 @@ function applyPalette(rgba, palette, format = "rgb565") {
   if (!(rgba instanceof Uint8Array) && !(rgba instanceof Uint8ClampedArray)) {
     throw new Error("quantize() expected RGBA Uint8Array data");
   }
+  if (palette.length > 256) {
+    throw new Error("applyPalette() only works with 256 colors or less");
+  }
   const data = new Uint32Array(rgba.buffer);
+  const length = data.length;
   const bincount = format === "rgb444" ? 4096 : 65536;
-  const index = new Uint8Array(data.length);
+  const index = new Uint8Array(length);
   const cache = new Array(bincount);
   const hasAlpha = format === "rgba4444";
   if (format === "rgba4444") {
-    for (let i = 0; i < data.length; i++) {
+    for (let i = 0; i < length; i++) {
       const color = data[i];
       const a = color >> 24 & 255;
       const b = color >> 16 & 255;
       const g = color >> 8 & 255;
       const r = color & 255;
       const key = rgba8888_to_rgba4444(r, g, b, a);
-      let idx;
-      if (cache[key] != null) {
-        idx = cache[key];
-      } else {
-        idx = nearestColorIndexRGBA(r, g, b, a, palette);
-        cache[key] = idx;
-      }
+      const idx = key in cache ? cache[key] : cache[key] = nearestColorIndexRGBA(r, g, b, a, palette);
       index[i] = idx;
     }
   } else {
     const rgb888_to_key = format === "rgb444" ? rgb888_to_rgb444 : rgb888_to_rgb565;
-    for (let i = 0; i < data.length; i++) {
+    for (let i = 0; i < length; i++) {
       const color = data[i];
       const b = color >> 16 & 255;
       const g = color >> 8 & 255;
       const r = color & 255;
       const key = rgb888_to_key(r, g, b);
-      let idx;
-      if (cache[key] != null) {
-        idx = cache[key];
-      } else {
-        idx = nearestColorIndexRGB(r, g, b, palette);
-        cache[key] = idx;
-      }
+      const idx = key in cache ? cache[key] : cache[key] = nearestColorIndexRGB(r, g, b, palette);
       index[i] = idx;
     }
   }
