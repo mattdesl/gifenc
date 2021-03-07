@@ -35,7 +35,7 @@ Also see [./test/encode_node.js](./test/encode_node.js) for a pure Node.js examp
 Basic code example:
 
 ```js
-import { GIFEncoder, quantize, applyPalette } from 'https://unpkg.com/gifenc@1.0.1';
+import { GIFEncoder, quantize, applyPalette } from 'https://unpkg.com/gifenc';
 
 // Get your RGBA image into Uint8Array data, such as from canvas
 const { data, width, height } = /* ... getImageData() ... */;
@@ -167,7 +167,7 @@ Same as above, but returns a tuple of `index` and `distance` (euclidean distance
 
 For the best speed, you should use workers to split this work across multiple threads. Compare these encoding speeds with 150 frames of 1024x1024px GIF in Chrome:
 
-- Main thread only: ~6 seconds
+- Main thread only: ~5 seconds
 - Split across 4 workers: ~2 seconds
 
 This library will run fine in a worker with ES support, but there is currently no built-in worker API, and it's up to the developer to implement their own worker architecture and handle bundling.
