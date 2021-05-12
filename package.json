@@ -8,6 +8,7 @@
   "unpkg": "./dist/gifenc.esm.js",
   "jsdelivr": "./dist/gifenc.esm.js",
   "module": "./dist/gifenc.esm.js",
+  "types": "./types.d.ts",
   "license": "MIT",
   "author": {
     "name": "Matt DesLauriers",
