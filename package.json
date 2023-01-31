@@ -25,10 +25,11 @@
     "serve": "^11.3.2"
   },
   "scripts": {
-    "prepublishOnly": "npm run dist:esm && npm run dist:cjs",
+    "prepublishOnly": "npm run dist:esm && npm run dist:cjs && npm run dist:iife",
     "serve": "serve .",
     "dist:esm": "esbuild ./src/index.js --bundle --format=esm --outfile=dist/gifenc.esm.js --minify --sourcemap --target=chrome58,firefox57,safari11,edge16,node12",
-    "dist:cjs": "esbuild ./src/index.js --bundle --format=cjs --outfile=dist/gifenc.js --sourcemap --target=chrome58,firefox57,safari11,edge16,node12"
+    "dist:cjs": "esbuild ./src/index.js --bundle --format=cjs --platform=browser --outfile=dist/gifenc.js --minify --sourcemap --target=chrome58,firefox57,safari11,edge16,node12",
+    "dist:iife": "esbuild ./src/index.js --bundle --global-name=gifenc --format=iife --platform=browser --minify --outfile=dist/gifenc.browser.js --sourcemap --target=chrome58,firefox57,safari11,edge16,node12"
   },
   "ava": {
     "require": [

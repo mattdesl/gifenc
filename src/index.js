@@ -2,14 +2,15 @@ import constants from "./constants.js";
 import lzwEncode from "./lzwEncode.js";
 import createStream from "./stream.js";
 import quantize from "./pnnquant2.js";
+import dither from "./dither.js";
 
 import {
   prequantize,
   applyPalette,
-  nearestColorIndex,
-  nearestColor,
-  nearestColorIndexWithDistance,
-  snapColorsToPalette,
+  // nearestColorIndex,
+  // nearestColor,
+  // nearestColorIndexWithDistance,
+  // snapColorsToPalette,
 } from "./palettize.js";
 
 function GIFEncoder(opt = {}) {
@@ -285,10 +286,11 @@ export {
   quantize,
   prequantize,
   applyPalette,
-  nearestColorIndex,
-  nearestColor,
-  nearestColorIndexWithDistance,
-  snapColorsToPalette,
+  // nearestColorIndex,
+  // nearestColor,
+  // nearestColorIndexWithDistance,
+  // snapColorsToPalette,
+  dither,
 };
 
 export default GIFEncoder;

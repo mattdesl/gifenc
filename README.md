@@ -8,6 +8,7 @@ A fast and lightweight pure-JavaScript GIF encoder. Features:
 - Works in browser and Node.js (ESM + CJS)
 - Highly optimized for V8 (150 1024x1024px frames takes about 2.1 seconds with workers in Chrome)
 - Small library footprint (9KB before GZIP)
+- Optional Floyd-Steinberg dithering
 - Can be used across multiple web workers for multi-core devices
 - Allows full control over encoding indexed bitmaps & per frame color palette
 - Fast built-in color quantizer based on a port of PnnQuant.js, which is based on "Pairwise Nearest Neighbor Clustering" [1](https://pdfs.semanticscholar.org/68b4/236e77d6026943ffa009d8b3553ace09a922.pdf) [2](https://github.com/mcychan/PnnQuant.js) [3](https://github.com/mcychan/nQuant.j2se)
@@ -35,7 +36,7 @@ Also see [./test/encode_node.js](./test/encode_node.js) for a pure Node.js examp
 Basic code example:
 
 ```js
-import { GIFEncoder, quantize, applyPalette } from 'https://unpkg.com/gifenc';
+import { GIFEncoder, quantize, dither } from 'https://unpkg.com/gifenc';
 
 // Get your RGBA image into Uint8Array data, such as from canvas
 const { data, width, height } = /* ... getImageData() ... */;
@@ -43,8 +44,8 @@ const { data, width, height } = /* ... getImageData() ... */;
 // Quantize your colors to a 256-color RGB palette palette
 const palette = quantize(data, 256);
 
-// Get an indexed bitmap by reducing each pixel to the nearest color palette
-const index = applyPalette(data, palette);
+// Use Floyd-Steinberg dithering to reduce the pixel data to our desired palette
+const index = dither(data, width, height, palette);
 
 // Create an encoding stream
 const gif = GIFEncoder();
@@ -91,13 +92,17 @@ The method uses `palette`, which is an array of arrays such as received from the
 
 ```js
 const palette = [
-  [ 0, 255, 10 ],
-  [ 50, 20, 100 ],
+  [0, 255, 10],
+  [50, 20, 100],
   // ...
 ];
 ```
 
 The `format` is the same as in `quantize`, and you can choose between opaque (RGB) and semi-transparent (RGBA) formats. You'll likely want to choose the same format you used to quantize your image.
+
+### `index = dither(rgba, width, height, palette, format = "rgb565", kernel = FloydSteinberg)`
+
+Like `applyPalette`, this builds an indexed image, except that this method will diffuse errors while building the index, creating a dithered output. This is preferable to `applyPalette` for certain types of busy graphics (like gradients, photographs, shaders) and may help reduce color jittering.
 
 ### `gif = GIFEncoder(opts = {})`
 
@@ -175,7 +180,7 @@ This library will run fine in a worker with ES support, but there is currently n
 The simplest architecture, and the one used in my [Looom exporter](https://github.com/mattdesl/looom-tools/blob/dd04eb2985a8defec3dc9874600ca033bda5d96f/site/components/record.js#L250), is to:
 
 - Send the RGBA pixel data of each frame to one worker amongst a pool of multiple workers
-- In the worker, do quantization, apply palette, and then use `GIFEncoder({ auto: false })` to write a 'chunk' of GIF without a header or end-of-stream
+- In the worker, do quantization, apply palette or dither, and then use `GIFEncoder({ auto: false })` to write a 'chunk' of GIF without a header or end-of-stream
 - Send the encoded bytes view back to the main thread, which will store the chunk into a linear array
 - Once all streams have been encoded and their workers responded with encoded chunks, you can write all frames sequentially into a single GIF stream
 
@@ -187,11 +192,11 @@ There are generally 3 steps involved, but some applications might be able to ski
 
 For each frame in your animation (or, just a single frame for still images):
 
-1. You'll first need to convert RGB(A) pixels from your source graphic/photograph into a reduced color table (palette) of 256 or less RGB colors. The act of reducing thousands of colors into 256 unique colors that still produce good quality results is known as *quantization*.
-2. Then, you'll need to turn your RGB(A) pixels into an *indexed bitmap*, basically going through each pixel and finding the nearest *index* into the color table for that pixel, based on our reduced palette. In `gifenc`, we call this *applying a palette*. The result of this is a bitmap image where each pixel is an index integer in the range 0..255 that points to a color in your palette.
-3. Now, we can *encode* this single frame by writing the indexed bitmap and local palette. This will compress the pixel data with GIF/LZW encoding, and add it to the GIF stream.
+1. You'll first need to convert RGB(A) pixels from your source graphic/photograph into a reduced color table (palette) of 256 or less RGB colors. The act of reducing thousands of colors into 256 unique colors that still produce good quality results is known as _quantization_.
+2. Then, you'll need to turn your RGB(A) pixels into an _indexed bitmap_, basically going through each pixel and finding the nearest _index_ into the color table for that pixel, based on our reduced palette. In `gifenc`, we call this _applying a palette_ (or _dithering_). The result of this is a bitmap image where each pixel is an index integer in the range 0..255 that points to a color in your palette.
+3. Now, we can _encode_ this single frame by writing the indexed bitmap and local palette. This will compress the pixel data with GIF/LZW encoding, and add it to the GIF stream.
 
-There's some situations where you might need to change the way you approach these steps. For example, if you decide to use a single global 256-color palette for a whole animation, you might only need to *quantize* once, and then *applyPalette* to each frame by reducing to the same global palette. In some other cases, you might choose to add *prequantization* or *postquantization* to speed up and improve the quantization results, or perhaps skip steps #2 and #3 if you already have indexed images. Or, you might choose to use dithering, or perhaps another quantizer entirely.
+There's some situations where you might need to change the way you approach these steps. For example, if you decide to use a single global 256-color palette for a whole animation, you might only need to _quantize_ once, and then _applyPalette_ (or _dither_) to each frame by reducing to the same global palette. In some other cases, you might choose to add _prequantization_ or _postquantization_ to speed up and improve the quantization results, or perhaps skip steps #2 and #3 if you already have indexed images. Or, you might choose to use a different dithering algorithm, or perhaps another quantizer entirely.
 
 ## Running from Source
 
@@ -225,7 +230,13 @@ npm run serve
 
 Now navigate to [http://localhost:5000/test/bench_web.html](http://localhost:5000/test/bench_web.html).
 
-Similarly, while serving you can 
+## Node, ESM, Browser
+
+There are three entry points due to fragmentation of JS module management:
+
+- `gifenc/dist/gifenc.esm.js` (for ES Module bundlers and native web import, this is the default `"module"` field)
+- `gifenc/dist/gifenc.js` (for node/CommonJS, this is the default `"main"` field)
+- `gifenc/dist/gifenc.browser.js` (for legacy `<script>` tag inclusion, using a IIFE and binding to `window.gifenc`)
 
 ## More to Come
 

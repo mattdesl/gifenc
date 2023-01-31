@@ -10,15 +10,9 @@ import {
   rgb888_to_rgb565,
   rgb888_to_rgb444,
   rgba8888_to_rgba4444,
-} from "./rgb-packing.js";
-
-function clamp(value, min, max) {
-  return value < min ? min : value > max ? max : value;
-}
-
-function sqr(value) {
-  return value * value;
-}
+  sqr,
+  clamp,
+} from "./util.js";
 
 function find_nn(bins, idx, hasAlpha) {
   var nn = 0;
@@ -106,9 +100,7 @@ function create_bin_list(data, format) {
       bin.ac += a;
       bin.cnt++;
     }
-  }
-  
-  else if (format === "rgb444") {
+  } else if (format === "rgb444") {
     for (let i = 0; i < size; ++i) {
       const color = data[i];
       const b = (color >> 16) & 0xff;
@@ -152,12 +144,12 @@ export default function quantize(rgba, maxColors, opts = {}) {
   } = opts;
 
   if (!rgba || !rgba.buffer) {
-    throw new Error('quantize() expected RGBA Uint8Array data');
+    throw new Error("quantize() expected RGBA Uint8Array data");
   }
   if (!(rgba instanceof Uint8Array) && !(rgba instanceof Uint8ClampedArray)) {
-    throw new Error('quantize() expected RGBA Uint8Array data');
+    throw new Error("quantize() expected RGBA Uint8Array data");
   }
-  
+
   const data = new Uint32Array(rgba.buffer);
 
   let useSqrt = opts.useSqrt !== false;

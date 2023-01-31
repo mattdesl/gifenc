@@ -6,7 +6,7 @@ const fs = require("fs");
 // NOTE: Uses the built version, not source!
 const { GIFEncoder, quantize, applyPalette } = require("../dist/gifenc");
 
-const N = 100;
+const N = 10;
 
 (async () => {
   // Load width/height + RGBA uint8 array data
@@ -14,46 +14,45 @@ const N = 100;
     path.resolve(__dirname, "fixtures/baboon.png")
   );
 
-  const format = 'rgb444';
+  const format = "rgba4444";
+  // bench_quantize(data, format);
 
-  bench_quantize(data, format);
+  const palette = quantize(data, 256, { format });
+  bench_palette(data, palette, "rgb888");
 
-  const palette = quantize(data, 256, { format })
-  bench_palette(data, palette, format);
-
-  const index = applyPalette(data, palette, format);
-  bench_encode(index, width, height, palette);
+  // const index = applyPalette(data, palette, format);
+  // bench_encode(index, width, height, palette);
 })();
 
 async function bench_quantize(data, format) {
-  console.log('Quantization')
-  console.time('time');
+  console.log("Quantization");
+  console.time("time");
   let palette;
   for (let i = 0; i < N; i++) {
     palette = quantize(data, 256, { format });
   }
-  console.timeEnd('time');
+  console.timeEnd("time");
 }
 
 async function bench_palette(data, palette, format) {
-  console.log('Palettization')
-  console.time('time');
+  console.log("Palettization");
+  console.time("time");
   let index;
   for (let i = 0; i < N; i++) {
     index = applyPalette(data, palette, format);
   }
-  console.timeEnd('time');
+  console.timeEnd("time");
 }
 
 async function bench_encode(index, width, height, palette, format) {
-  console.log('Encode')
-  console.time('time');
+  console.log("Encode");
+  console.time("time");
   let encoder;
   for (let i = 0; i < N; i++) {
     encoder = GIFEncoder({ auto: false });
     encoder.writeFrame(index, width, height, { palette });
   }
-  console.timeEnd('time');
+  console.timeEnd("time");
 }
 
 async function readImage(file) {
