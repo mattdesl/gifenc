@@ -23,14 +23,33 @@ function setup() {
 function draw() {
   let playhead = getPlayhead();
 
+  noStroke();
+
   const gradient = drawingContext.createLinearGradient(0, 0, 0, height);
   gradient.addColorStop(0, "#42f5e6");
   gradient.addColorStop(1, "#d62bb4");
-  noStroke();
   push();
   drawingContext.fillStyle = gradient;
   rect(0, 0, width, height);
   pop();
+
+  // deterministic gradient
+  // let from = color("#42f5e6");
+  // let to = color("#d62bb4");
+  // colorMode(RGB);
+  // const imgData = drawingContext.createImageData(canvas.width, canvas.height);
+  // for (let y = 0; y < canvas.height; y++) {
+  //   for (let x = 0; x < canvas.width; x++) {
+  //     const u = y / canvas.height;
+  //     const c = lerpColor(from, to, u).levels;
+  //     const idx = x + y * canvas.width;
+  //     imgData.data[idx * 4 + 0] = c[0];
+  //     imgData.data[idx * 4 + 1] = c[1];
+  //     imgData.data[idx * 4 + 2] = c[2];
+  //     imgData.data[idx * 4 + 3] = 0xff;
+  //   }
+  // }
+  // drawingContext.putImageData(imgData, 0, 0);
 
   for (let i = 0; i < 20; i++) {
     push();
@@ -60,6 +79,8 @@ function renderGIF() {
   const colors = config.colors || 256;
   const gif = GIFEncoder();
 
+  let palette;
+
   let interval = setInterval(() => {
     if (config._frame >= config._totalFrames) {
       clearInterval(interval);
@@ -72,9 +93,9 @@ function renderGIF() {
     const imgData = drawingContext.getImageData(0, 0, w, h);
     const data = imgData.data;
 
-    const palette = quantize(data, colors);
-    // const index = dither(data, w, h, palette);
-    const index = applyPalette(data, palette, "rgb444");
+    palette = palette || quantize(data, colors);
+    const index = dither(data, w, h, palette);
+    // const index = applyPalette(data, palette, "rgb565");
     gif.writeFrame(index, w, h, { palette, delay });
 
     config._frame++;
@@ -86,6 +107,7 @@ function renderGIF() {
     const output = gif.bytesView();
     const blob = new Blob([output], { type: "image/gif" });
     // await saveBlob(blob, "download.gif");
+
     const img = document.createElement("img");
     img.src = URL.createObjectURL(blob);
     document.body.appendChild(img);
