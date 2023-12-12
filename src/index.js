@@ -56,6 +56,8 @@ function GIFEncoder(opt = {}) {
         repeat = 0, // -1=once, 0=forever, >0=count
         colorDepth = 8,
         dispose = -1,
+        x = 0,
+        y = 0
       } = opts;
 
       let first = false;
@@ -75,6 +77,9 @@ function GIFEncoder(opt = {}) {
         // in manual mode, the first frame is determined by the options only
         first = Boolean(opts.first);
       }
+
+      let localX = Math.max(0, Math.floor(x));
+      let localY = Math.max(0, Math.floor(y));
 
       width = Math.max(0, Math.floor(width));
       height = Math.max(0, Math.floor(height));
@@ -109,6 +114,8 @@ function GIFEncoder(opt = {}) {
       const useLocalColorTable = Boolean(palette) && !first;
       encodeImageDescriptor(
         stream,
+        localX,
+        localY,
         width,
         height,
         useLocalColorTable ? palette : null
@@ -224,11 +231,11 @@ function encodeColorTable(stream, palette) {
   }
 }
 
-function encodeImageDescriptor(stream, width, height, localPalette) {
+function encodeImageDescriptor(stream, x, y, width, height, localPalette) {
   stream.writeByte(0x2c); // image separator
 
-  writeUInt16(stream, 0); // x position
-  writeUInt16(stream, 0); // y position
+  writeUInt16(stream, x); // x position
+  writeUInt16(stream, y); // y position
   writeUInt16(stream, width); // image size
   writeUInt16(stream, height);
 
