@@ -1,9 +1,11 @@
-const path = require("path");
-const { promisify } = require("util");
-const getPixels = promisify(require("get-pixels"));
-const fs = require("fs");
+import * as path from "path";
+import { promisify } from "util";
+import { writeFile } from "fs/promises";
+import getPixelsCb from "get-pixels";
+import { GIFEncoder, quantize, applyPalette } from "../src/index.js";
 
-const { GIFEncoder, quantize, applyPalette } = require("../dist/gifenc");
+const getPixels = promisify(getPixelsCb);
+const __dirname = import.meta.dirname;
 
 encode();
 
@@ -35,7 +37,7 @@ async function encode() {
   const bytes = gif.bytes();
 
   // Write the uint8 array data to file
-  fs.writeFileSync(
+  await writeFile(
     path.resolve(__dirname, "output/test.gif"),
     Buffer.from(bytes)
   );
