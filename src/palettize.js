@@ -2,6 +2,7 @@ import {
   rgb888_to_rgb444,
   rgb888_to_rgb565,
   rgba8888_to_rgba4444,
+  validateFormat
 } from "./rgb-packing.js";
 
 import { euclideanDistanceSquared } from "./color.js";
@@ -46,12 +47,14 @@ export function applyPalette(rgba, palette, format = "rgb565") {
     throw new Error('applyPalette() only works with 256 colors or less');
   }
 
+  validateFormat(format);
+
   const data = new Uint32Array(rgba.buffer);
   const length = data.length;
   const bincount = format === "rgb444" ? 4096 : 65536;
   const index = new Uint8Array(length);
   const cache = new Array(bincount);
-  const hasAlpha = format === "rgba4444";
+  // const hasAlpha = format === "rgba4444";
 
   // Some duplicate code below due to very hot code path
   // Introducing branching/conditions shows some significant impact

@@ -5,7 +5,7 @@ import {
   quantize
 } from "../src/index.js";
 
-const N = 100;
+const N = 1;
 
 async function readImage(url) {
   const img = await loadImage(url);
@@ -28,28 +28,29 @@ async function loadImage(url) {
 
 (async () => {
   const { data, width, height } = await readImage(
-    "/test/fixtures/007-transparent.png"
+    '/test/fixtures/baboon.png'
+    // "/test/fixtures/007-transparent.png"
   );
 
-  const format = 'rgb444';
+  const format = 'rgb565';
 
   bench_quantize(data, format);
 
-  const palette = quantize(data, 256, { format })
-  bench_palette(data, palette, format);
+  // const palette = quantize(data, 256, { format })
+  // bench_palette(data, palette, format);
 
-  const index = applyPalette(data, palette, format);
-  bench_encode(index, width, height, palette);
+  // const index = applyPalette(data, palette, format);
+  // bench_encode(index, width, height, palette);
 })();
 
 async function bench_quantize(rgba, format) {
   console.time('quantize');
-  console.profile('quantize');
+  // console.profile('quantize');
   let palette;
   for (let i = 0; i < N; i++) {
     palette = quantize(rgba, 256, { format });
   }
-  console.profileEnd('quantize');
+  // console.profileEnd('quantize');
   console.timeEnd('quantize');
 }
 

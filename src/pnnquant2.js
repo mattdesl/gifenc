@@ -10,6 +10,7 @@ import {
   rgb888_to_rgb565,
   rgb888_to_rgb444,
   rgba8888_to_rgba4444,
+  validateFormat
 } from "./rgb-packing.js";
 
 function clamp(value, min, max) {
@@ -30,6 +31,7 @@ function find_nn(bins, idx, hasAlpha) {
   const wr = bin1.rc;
   const wg = bin1.gc;
   const wb = bin1.bc;
+  var checks = 0;
   for (var i = bin1.fw; i != 0; i = bins[i].fw) {
     const bin = bins[i];
     const n2 = bin.cnt;
@@ -52,6 +54,7 @@ function find_nn(bins, idx, hasAlpha) {
     if (nerr >= err) continue;
     err = nerr;
     nn = i;
+    checks++;
   }
   bin1.err = err;
   bin1.nn = nn;
@@ -80,18 +83,18 @@ function bin_add_rgb(bin, r, g, b) {
   bin.cnt++;
 }
 
-function create_bin_list(data, format) {
+
+function create_bin_list(dv, size, format) {
   const bincount = format === "rgb444" ? 4096 : 65536;
   const bins = new Array(bincount);
-  const size = data.length;
-
+  
   /* Build histogram */
   // Note: Instead of introducing branching/conditions
   // within a very hot per-pixel iteration, we just duplicate the code
   // for each new condition
   if (format === "rgba4444") {
     for (let i = 0; i < size; ++i) {
-      const color = data[i];
+      const color = dv.getUint32(i*4,true);
       const a = (color >> 24) & 0xff;
       const b = (color >> 16) & 0xff;
       const g = (color >> 8) & 0xff;
@@ -107,16 +110,16 @@ function create_bin_list(data, format) {
       bin.cnt++;
     }
   }
-  
   else if (format === "rgb444") {
     for (let i = 0; i < size; ++i) {
-      const color = data[i];
+      const color = dv.getUint32(i*4,true);
       const b = (color >> 16) & 0xff;
       const g = (color >> 8) & 0xff;
       const r = color & 0xff;
 
       // reduce to rgb444 12-bit uint
       const index = rgb888_to_rgb444(r, g, b);
+
       let bin = index in bins ? bins[index] : (bins[index] = create_bin());
       bin.rc += r;
       bin.gc += g;
@@ -125,7 +128,7 @@ function create_bin_list(data, format) {
     }
   } else {
     for (let i = 0; i < size; ++i) {
-      const color = data[i];
+      const color = dv.getUint32(i*4,true);
       const b = (color >> 16) & 0xff;
       const g = (color >> 8) & 0xff;
       const r = color & 0xff;
@@ -139,12 +142,13 @@ function create_bin_list(data, format) {
       bin.cnt++;
     }
   }
+
   return bins;
 }
 
 export default function quantize(rgba, maxColors, opts = {}) {
   const {
-    format = "rgb565",
+    format = "rgb444",
     clearAlpha = true,
     clearAlphaColor = 0x00,
     clearAlphaThreshold = 0,
@@ -158,17 +162,19 @@ export default function quantize(rgba, maxColors, opts = {}) {
     throw new Error('quantize() expected RGBA Uint8Array data');
   }
   
-  const data = new Uint32Array(rgba.buffer);
+  validateFormat(format);
+
+  const dv = new DataView(rgba.buffer);
 
   let useSqrt = opts.useSqrt !== false;
 
   // format can be:
-  // rgb565 (default)
-  // rgb444
+  // rgb565
+  // rgb444 (default)
   // rgba4444
 
   const hasAlpha = format === "rgba4444";
-  const bins = create_bin_list(data, format);
+  const bins = create_bin_list(dv, rgba.length / 4, format);
   const bincount = bins.length;
   const bincountMinusOne = bincount - 1;
   const heap = new Uint32Array(bincount + 1);
@@ -191,6 +197,7 @@ export default function quantize(rgba, maxColors, opts = {}) {
     useSqrt = false;
   }
 
+  console.profile('nn')
   var i = 0;
   for (; i < maxbins - 1; ++i) {
     bins[i].fw = i + 1;
@@ -256,8 +263,8 @@ export default function quantize(rgba, maxColors, opts = {}) {
     bins[nb.fw].bk = nb.bk;
     nb.mtm = bincountMinusOne;
   }
+  console.profileEnd('nn')
 
-  // let palette = new Uint32Array(maxColors);
   let palette = [];
 
   /* Fill palette */

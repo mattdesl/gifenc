@@ -14,7 +14,7 @@ async function encode() {
   );
 
   // Choose a pixel format: rgba4444, rgb444, rgb565
-  const format = "rgb444";
+  const format = "rgb565";
 
   // If necessary, quantize your colors to a reduced palette
   const palette = quantize(data, 256, { format });

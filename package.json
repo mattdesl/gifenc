@@ -15,14 +15,14 @@
     "email": "dave.des@gmail.com",
     "url": "https://github.com/mattdesl"
   },
-  "dependencies": {},
   "devDependencies": {
     "ava": "^3.15.0",
     "canvas-sketch-util": "^1.10.0",
     "esbuild": "^0.8.52",
     "esm": "^3.2.25",
     "get-pixels": "^3.3.2",
-    "serve": "^11.3.2"
+    "serve": "^11.3.2",
+    "tape": "^5.8.1"
   },
   "scripts": {
     "prepublishOnly": "npm run dist:esm && npm run dist:cjs",

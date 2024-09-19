@@ -227,14 +227,29 @@ function lzwEncode(width, height, pixels, colorDepth, outStream = createStream(5
 var lzwEncode_default = lzwEncode;
 
 // src/rgb-packing.js
+var FORMATS = ["rgb444", "rgba4444", "rgb565"];
+function validateFormat(format) {
+  if (!FORMATS.includes(format))
+    throw new Error("Unknown format: " + format);
+}
 function rgb888_to_rgb565(r, g, b) {
-  return r << 8 & 63488 | g << 2 & 992 | b >> 3;
+  let r5 = r >> 3;
+  let g6 = g >> 2;
+  let b5 = b >> 3;
+  return r5 << 11 | g6 << 5 | b5;
 }
 function rgba8888_to_rgba4444(r, g, b, a) {
-  return r >> 4 | g & 240 | (b & 240) << 4 | (a & 240) << 8;
+  r = r >> 4;
+  g = g >> 4;
+  b = b >> 4;
+  a = a >> 4;
+  return a << 12 | r << 8 | g << 4 | b;
 }
 function rgb888_to_rgb444(r, g, b) {
-  return r >> 4 << 8 | g & 240 | b >> 4;
+  r = r >> 4;
+  g = g >> 4;
+  b = b >> 4;
+  return r << 8 | g << 4 | b;
 }
 
 // src/pnnquant2.js
@@ -253,6 +268,7 @@ function find_nn(bins, idx, hasAlpha) {
   const wr = bin1.rc;
   const wg = bin1.gc;
   const wb = bin1.bc;
+  var checks = 0;
   for (var i = bin1.fw; i != 0; i = bins[i].fw) {
     const bin = bins[i];
     const n2 = bin.cnt;
@@ -276,7 +292,10 @@ function find_nn(bins, idx, hasAlpha) {
       continue;
     err = nerr;
     nn = i;
+    checks++;
   }
+  if (checks > 50)
+    console.log(checks, err, nn);
   bin1.err = err;
   bin1.nn = nn;
 }
@@ -295,13 +314,12 @@ function create_bin() {
     err: 0
   };
 }
-function create_bin_list(data, format) {
+function create_bin_list(dv, size, format) {
   const bincount = format === "rgb444" ? 4096 : 65536;
   const bins = new Array(bincount);
-  const size = data.length;
   if (format === "rgba4444") {
     for (let i = 0; i < size; ++i) {
-      const color = data[i];
+      const color = dv.getUint32(i * 4, true);
       const a = color >> 24 & 255;
       const b = color >> 16 & 255;
       const g = color >> 8 & 255;
@@ -316,7 +334,7 @@ function create_bin_list(data, format) {
     }
   } else if (format === "rgb444") {
     for (let i = 0; i < size; ++i) {
-      const color = data[i];
+      const color = dv.getUint32(i * 4, true);
       const b = color >> 16 & 255;
       const g = color >> 8 & 255;
       const r = color & 255;
@@ -329,7 +347,7 @@ function create_bin_list(data, format) {
     }
   } else {
     for (let i = 0; i < size; ++i) {
-      const color = data[i];
+      const color = dv.getUint32(i * 4, true);
       const b = color >> 16 & 255;
       const g = color >> 8 & 255;
       const r = color & 255;
@@ -345,7 +363,7 @@ function create_bin_list(data, format) {
 }
 function quantize(rgba, maxColors, opts = {}) {
   const {
-    format = "rgb565",
+    format = "rgb444",
     clearAlpha = true,
     clearAlphaColor = 0,
     clearAlphaThreshold = 0,
@@ -357,10 +375,11 @@ function quantize(rgba, maxColors, opts = {}) {
   if (!(rgba instanceof Uint8Array) && !(rgba instanceof Uint8ClampedArray)) {
     throw new Error("quantize() expected RGBA Uint8Array data");
   }
-  const data = new Uint32Array(rgba.buffer);
+  validateFormat(format);
+  const dv = new DataView(rgba.buffer);
   let useSqrt = opts.useSqrt !== false;
   const hasAlpha = format === "rgba4444";
-  const bins = create_bin_list(data, format);
+  const bins = create_bin_list(dv, rgba.length / 4, format);
   const bincount = bins.length;
   const bincountMinusOne = bincount - 1;
   const heap = new Uint32Array(bincount + 1);
@@ -522,12 +541,12 @@ function applyPalette(rgba, palette, format = "rgb565") {
   if (palette.length > 256) {
     throw new Error("applyPalette() only works with 256 colors or less");
   }
+  validateFormat(format);
   const data = new Uint32Array(rgba.buffer);
   const length = data.length;
   const bincount = format === "rgb444" ? 4096 : 65536;
   const index = new Uint8Array(length);
   const cache = new Array(bincount);
-  const hasAlpha = format === "rgba4444";
   if (format === "rgba4444") {
     for (let i = 0; i < length; i++) {
       const color = data[i];
