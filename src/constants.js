@@ -1,11 +1,11 @@
 export default {
   signature: "GIF",
   version: "89a",
-  trailer: 0x3B,
+  trailer: 0x3b,
   extensionIntroducer: 0x21,
-  applicationExtensionLabel: 0xFF,
-  graphicControlExtensionLabel: 0xF9,
-  imageSeparator: 0x2C,
+  applicationExtensionLabel: 0xff,
+  graphicControlExtensionLabel: 0xf9,
+  imageSeparator: 0x2c,
   // Header
   signatureSize: 3,
   versionSize: 3,
@@ -24,5 +24,5 @@ export default {
   localColorTableFlagMask: 0b10000000,
   interlaceFlagMask: 0b01000000,
   idSortFlagMask: 0b00100000,
-  localColorTableSizeMask: 0b00000111
-}
+  localColorTableSizeMask: 0b00000111,
+};

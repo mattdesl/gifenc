@@ -24,7 +24,7 @@ async function loadImage(url) {
 
 (async () => {
   const { data, width, height } = await readImage(
-    "/test/fixtures/007-transparent.png"
+    "/test/fixtures/007-transparent.png",
   );
 
   const format = "rgb444";

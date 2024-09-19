@@ -1,32 +1,27 @@
-import {
-  GIFEncoder, quantize, applyPalette
-} from '/src/index.js';
+import { GIFEncoder, quantize, applyPalette } from "/src/index.js";
 
 let options;
 
-self.addEventListener('message', ev => {
+self.addEventListener("message", (ev) => {
   const detail = ev.data;
-  if (detail.event === 'init') {
+  if (detail.event === "init") {
     // Upon init, save our options
     options = { ...detail };
     // And send back a ready event
-    self.postMessage('ready');
+    self.postMessage("ready");
   } else {
     // Get the options for the encoder
     const {
-      format = 'rgb444',
+      format = "rgb444",
       width,
       height,
       maxColors = 256,
       repeat = 0,
-      delay = 0
+      delay = 0,
     } = options;
 
     // Get the data + index for this frame
-    const [
-      data,
-      frame
-    ] = detail;
+    const [data, frame] = detail;
 
     // Get palette from this frame
     const palette = quantize(data, maxColors, { format });
@@ -45,6 +40,6 @@ self.addEventListener('message', ev => {
 
     // Send the result back ot main thread
     const output = gif.bytesView();
-    self.postMessage([ output, frame ], [output.buffer]);
+    self.postMessage([output, frame], [output.buffer]);
   }
 });

@@ -11,7 +11,7 @@ const N = 100;
 (async () => {
   // Load width/height + RGBA uint8 array data
   const { data, width, height } = await readImage(
-    path.resolve(__dirname, "fixtures/baboon.png")
+    path.resolve(__dirname, "fixtures/baboon.png"),
   );
 
   const format = "rgb444";

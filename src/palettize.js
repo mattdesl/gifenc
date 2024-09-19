@@ -12,7 +12,7 @@ function roundStep(byte, step) {
 
 export function prequantize(
   rgba,
-  { roundRGB = 5, roundAlpha = 10, oneBitAlpha = null } = {}
+  { roundRGB = 5, roundAlpha = 10, oneBitAlpha = null } = {},
 ) {
   const data = new Uint32Array(rgba.buffer);
   for (let i = 0; i < data.length; i++) {
@@ -37,13 +37,13 @@ export function prequantize(
 
 export function applyPalette(rgba, palette, format = "rgb565") {
   if (!rgba || !rgba.buffer) {
-    throw new Error('quantize() expected RGBA Uint8Array data');
+    throw new Error("quantize() expected RGBA Uint8Array data");
   }
   if (!(rgba instanceof Uint8Array) && !(rgba instanceof Uint8ClampedArray)) {
-    throw new Error('quantize() expected RGBA Uint8Array data');
+    throw new Error("quantize() expected RGBA Uint8Array data");
   }
   if (palette.length > 256) {
-    throw new Error('applyPalette() only works with 256 colors or less');
+    throw new Error("applyPalette() only works with 256 colors or less");
   }
 
   const data = new Uint32Array(rgba.buffer);
@@ -63,18 +63,25 @@ export function applyPalette(rgba, palette, format = "rgb565") {
       const g = (color >> 8) & 0xff;
       const r = color & 0xff;
       const key = rgba8888_to_rgba4444(r, g, b, a);
-      const idx = key in cache ? cache[key] : (cache[key] = nearestColorIndexRGBA(r, g, b, a, palette));
+      const idx =
+        key in cache
+          ? cache[key]
+          : (cache[key] = nearestColorIndexRGBA(r, g, b, a, palette));
       index[i] = idx;
     }
   } else {
-    const rgb888_to_key = format === "rgb444" ? rgb888_to_rgb444 : rgb888_to_rgb565;
+    const rgb888_to_key =
+      format === "rgb444" ? rgb888_to_rgb444 : rgb888_to_rgb565;
     for (let i = 0; i < length; i++) {
       const color = data[i];
       const b = (color >> 16) & 0xff;
       const g = (color >> 8) & 0xff;
       const r = color & 0xff;
       const key = rgb888_to_key(r, g, b);
-      const idx = key in cache ? cache[key] : (cache[key] = nearestColorIndexRGB(r, g, b, palette));
+      const idx =
+        key in cache
+          ? cache[key]
+          : (cache[key] = nearestColorIndexRGB(r, g, b, palette));
       index[i] = idx;
     }
   }
@@ -146,7 +153,7 @@ export function snapColorsToPalette(palette, knownColors, threshold = 5) {
     const r = nearestColorIndexWithDistance(
       paletteRGB,
       color.slice(0, 3),
-      euclideanDistanceSquared
+      euclideanDistanceSquared,
     );
     const idx = r[0];
     const distanceSq = r[1];
@@ -163,7 +170,7 @@ function sqr(a) {
 export function nearestColorIndex(
   colors,
   pixel,
-  distanceFn = euclideanDistanceSquared
+  distanceFn = euclideanDistanceSquared,
 ) {
   let minDist = Infinity;
   let minDistIndex = -1;
@@ -181,7 +188,7 @@ export function nearestColorIndex(
 export function nearestColorIndexWithDistance(
   colors,
   pixel,
-  distanceFn = euclideanDistanceSquared
+  distanceFn = euclideanDistanceSquared,
 ) {
   let minDist = Infinity;
   let minDistIndex = -1;
@@ -199,7 +206,7 @@ export function nearestColorIndexWithDistance(
 export function nearestColor(
   colors,
   pixel,
-  distanceFn = euclideanDistanceSquared
+  distanceFn = euclideanDistanceSquared,
 ) {
   return colors[nearestColorIndex(colors, pixel, distanceFn)];
 }

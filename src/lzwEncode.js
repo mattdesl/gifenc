@@ -26,23 +26,8 @@ const EOF = -1;
 const BITS = 12;
 const DEFAULT_HSIZE = 5003; // 80% occupancy
 const MASKS = [
-  0x0000,
-  0x0001,
-  0x0003,
-  0x0007,
-  0x000f,
-  0x001f,
-  0x003f,
-  0x007f,
-  0x00ff,
-  0x01ff,
-  0x03ff,
-  0x07ff,
-  0x0fff,
-  0x1fff,
-  0x3fff,
-  0x7fff,
-  0xffff,
+  0x0000, 0x0001, 0x0003, 0x0007, 0x000f, 0x001f, 0x003f, 0x007f, 0x00ff,
+  0x01ff, 0x03ff, 0x07ff, 0x0fff, 0x1fff, 0x3fff, 0x7fff, 0xffff,
 ];
 
 function lzwEncode(
@@ -53,7 +38,7 @@ function lzwEncode(
   outStream = createStream(512),
   accum = new Uint8Array(256),
   htab = new Int32Array(DEFAULT_HSIZE),
-  codetab = new Int32Array(DEFAULT_HSIZE)
+  codetab = new Int32Array(DEFAULT_HSIZE),
 ) {
   const hsize = htab.length;
   const initCodeSize = Math.max(2, colorDepth);
@@ -182,7 +167,7 @@ function lzwEncode(
         clear_flg = false;
       } else {
         ++n_bits;
-        maxcode = n_bits === BITS ? (1 << n_bits) : (1 << n_bits) - 1;
+        maxcode = n_bits === BITS ? 1 << n_bits : (1 << n_bits) - 1;
       }
     }
 

@@ -89,7 +89,7 @@ function GIFEncoder(opt = {}) {
           width,
           height,
           palette,
-          colorDepth
+          colorDepth,
         );
         encodeColorTable(stream, palette);
         if (repeat >= 0) {
@@ -103,7 +103,7 @@ function GIFEncoder(opt = {}) {
         dispose,
         delayTime,
         transparent,
-        transparentIndex
+        transparentIndex,
       );
 
       const useLocalColorTable = Boolean(palette) && !first;
@@ -111,7 +111,7 @@ function GIFEncoder(opt = {}) {
         stream,
         width,
         height,
-        useLocalColorTable ? palette : null
+        useLocalColorTable ? palette : null,
       );
       if (useLocalColorTable) encodeColorTable(stream, palette);
       encodePixels(
@@ -122,7 +122,7 @@ function GIFEncoder(opt = {}) {
         colorDepth,
         accum,
         htab,
-        codetab
+        codetab,
       );
     },
   };
@@ -137,7 +137,7 @@ function encodeGraphicControlExt(
   dispose,
   delay,
   transparent,
-  transparentIndex
+  transparentIndex,
 ) {
   stream.writeByte(0x21); // extension introducer
   stream.writeByte(0xf9); // GCE label
@@ -170,7 +170,7 @@ function encodeGraphicControlExt(
     0 | // 1:3 reserved
       disp | // 4:6 disposal
       userInput | // 7 user input - 0 = none
-      transp // 8 transparency flag
+      transp, // 8 transparency flag
   );
 
   writeUInt16(stream, delay); // delay x 1/100 sec
@@ -183,7 +183,7 @@ function encodeLogicalScreenDescriptor(
   width,
   height,
   palette,
-  colorDepth = 8
+  colorDepth = 8,
 ) {
   const globalColorTableFlag = 1;
   const sortFlag = 0;
@@ -242,7 +242,7 @@ function encodeImageDescriptor(stream, width, height, localPalette) {
         interlace | // 2 interlace - 0=no
         sorted | // 3 sorted - 0=no
         0 | // 4-5 reserved
-        palSize // 6-8 size of color table
+        palSize, // 6-8 size of color table
     );
   } else {
     // global palette
@@ -258,7 +258,7 @@ function encodePixels(
   colorDepth = 8,
   accum,
   htab,
-  codetab
+  codetab,
 ) {
   lzwEncode(width, height, index, colorDepth, stream, accum, htab, codetab);
 }

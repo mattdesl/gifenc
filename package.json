@@ -11,7 +11,6 @@
     "email": "dave.des@gmail.com",
     "url": "https://github.com/mattdesl"
   },
-  "dependencies": {},
   "devDependencies": {
     "esbuild": "^0.8.52",
     "get-pixels": "^3.3.2",

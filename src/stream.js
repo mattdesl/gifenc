@@ -43,7 +43,7 @@ export default function createStream(initialCapacity = 256) {
     newCapacity = Math.max(
       newCapacity,
       (prevCapacity * (prevCapacity < CAPACITY_DOUBLING_MAX ? 2.0 : 1.125)) >>>
-        0
+        0,
     );
     if (prevCapacity != 0) newCapacity = Math.max(newCapacity, 256); // At minimum allocate 256b for each file when expanding.
     const oldContents = contents;

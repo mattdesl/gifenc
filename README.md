@@ -91,8 +91,8 @@ The method uses `palette`, which is an array of arrays such as received from the
 
 ```js
 const palette = [
-  [ 0, 255, 10 ],
-  [ 50, 20, 100 ],
+  [0, 255, 10],
+  [50, 20, 100],
   // ...
 ];
 ```
@@ -187,11 +187,11 @@ There are generally 3 steps involved, but some applications might be able to ski
 
 For each frame in your animation (or, just a single frame for still images):
 
-1. You'll first need to convert RGB(A) pixels from your source graphic/photograph into a reduced color table (palette) of 256 or less RGB colors. The act of reducing thousands of colors into 256 unique colors that still produce good quality results is known as *quantization*.
-2. Then, you'll need to turn your RGB(A) pixels into an *indexed bitmap*, basically going through each pixel and finding the nearest *index* into the color table for that pixel, based on our reduced palette. In `gifenc`, we call this *applying a palette*. The result of this is a bitmap image where each pixel is an index integer in the range 0..255 that points to a color in your palette.
-3. Now, we can *encode* this single frame by writing the indexed bitmap and local palette. This will compress the pixel data with GIF/LZW encoding, and add it to the GIF stream.
+1. You'll first need to convert RGB(A) pixels from your source graphic/photograph into a reduced color table (palette) of 256 or less RGB colors. The act of reducing thousands of colors into 256 unique colors that still produce good quality results is known as _quantization_.
+2. Then, you'll need to turn your RGB(A) pixels into an _indexed bitmap_, basically going through each pixel and finding the nearest _index_ into the color table for that pixel, based on our reduced palette. In `gifenc`, we call this _applying a palette_. The result of this is a bitmap image where each pixel is an index integer in the range 0..255 that points to a color in your palette.
+3. Now, we can _encode_ this single frame by writing the indexed bitmap and local palette. This will compress the pixel data with GIF/LZW encoding, and add it to the GIF stream.
 
-There's some situations where you might need to change the way you approach these steps. For example, if you decide to use a single global 256-color palette for a whole animation, you might only need to *quantize* once, and then *applyPalette* to each frame by reducing to the same global palette. In some other cases, you might choose to add *prequantization* or *postquantization* to speed up and improve the quantization results, or perhaps skip steps #2 and #3 if you already have indexed images. Or, you might choose to use dithering, or perhaps another quantizer entirely.
+There's some situations where you might need to change the way you approach these steps. For example, if you decide to use a single global 256-color palette for a whole animation, you might only need to _quantize_ once, and then _applyPalette_ to each frame by reducing to the same global palette. In some other cases, you might choose to add _prequantization_ or _postquantization_ to speed up and improve the quantization results, or perhaps skip steps #2 and #3 if you already have indexed images. Or, you might choose to use dithering, or perhaps another quantizer entirely.
 
 ## Running from Source
 
@@ -225,7 +225,7 @@ npm run serve
 
 Now navigate to [http://localhost:5000/test/bench_web.html](http://localhost:5000/test/bench_web.html).
 
-Similarly, while serving you can 
+Similarly, while serving you can
 
 ## More to Come
 

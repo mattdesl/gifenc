@@ -12,7 +12,7 @@ encode();
 async function encode() {
   // Load width/height + RGBA uint8 array data
   const { data, width, height } = await readImage(
-    path.resolve(__dirname, "fixtures/baboon.png")
+    path.resolve(__dirname, "fixtures/baboon.png"),
   );
 
   // Choose a pixel format: rgba4444, rgb444, rgb565
@@ -39,7 +39,7 @@ async function encode() {
   // Write the uint8 array data to file
   await writeFile(
     path.resolve(__dirname, "output/test.gif"),
-    Buffer.from(bytes)
+    Buffer.from(bytes),
   );
 }
 

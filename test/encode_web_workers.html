@@ -1,287 +1,292 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>gif-encoder</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      padding: 20px;
-    }
-    a {
-      color: tomato;
-    }
-  </style>
-</head>
-<body>
-  <p>A fast GIF encoder in JavaScript, see <a href="https://github.com/mattdesl/gifenc">mattdesl/gifenc</a>.</p>
-  <p>This demo uses Worker Modules so it may only work in Chrome. This could be resolved with a bundler like Parcel or Webpack.</p>
-  <div id='progress'></div>
-  <canvas></canvas>
-  <script type='module'>
-    import {
-      GIFEncoder, quantize, applyPalette
-    } from '/src/index.js';
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>gif-encoder</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        padding: 20px;
+      }
+      a {
+        color: tomato;
+      }
+    </style>
+  </head>
+  <body>
+    <p>
+      A fast GIF encoder in JavaScript, see
+      <a href="https://github.com/mattdesl/gifenc">mattdesl/gifenc</a>.
+    </p>
+    <p>
+      This demo uses Worker Modules so it may only work in Chrome. This could be
+      resolved with a bundler like Parcel or Webpack.
+    </p>
+    <div id="progress"></div>
+    <canvas></canvas>
+    <script type="module">
+      import { GIFEncoder, quantize, applyPalette } from "/src/index.js";
 
-    // Or import the bundled ESM version:
-    // import {
-    //   GIFEncoder, quantize, applyPalette
-    // } from '/dist/gifenc.esm.js';
+      const workerUrl = "/test/worker.js";
 
-    const workerUrl = '/test/worker.js';
+      encode();
 
-    encode();
-
-    function download (buf, filename, type) {
-      const blob = buf instanceof Blob ? buf : new Blob([buf], { type });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = filename;
-      anchor.click();
-    };
-
-    async function encode () {
-      const canvas = document.querySelector('canvas');
-      const context = canvas.getContext('2d');
-      const width = 1024;
-      const height = 1024;
-      canvas.width = width;
-      canvas.height = height;
-      canvas.style.width = '250px';
-      canvas.style.height = 'auto'
-
-      const fps = 30;
-      const duration = 5;
-      const totalFrames = Math.ceil(duration * fps);
-
-      const fpsInterval = 1 / fps;
-      const delay = fpsInterval * 1000;
-
-      const render = sketch();
-      const frames = new Array(totalFrames).fill(0).map((_, i) => i);
-
-      console.time('encode');
-
-      // Setup an encoder that we will write frames into
-      const encoder = await createWorkerEncoder({
-        totalFrames,
-        fps,
-        width,
-        height,
-        progress (v) {
-          const el = document.querySelector('#progress');
-          el.textContent = `Progress: ${Math.round(v * 100)}%`;
-        }
-      });
-
-      // We use for 'of' to loop with async await
-      for (let i of frames) {
-        // a t value 0..1 to animate the frame
-        const playhead = i / totalFrames;
-
-        // Render to 2D context
-        render({ context, width, height, playhead });
-
-        // Get RGBA data from canvas
-        const data = context.getImageData(0, 0, width, height).data;
-
-        // Send data to worker
-        encoder.addFrame(data, i);
-
-        // Wait a tick so that we don't lock up browser
-        await new Promise(resolve => setTimeout(resolve, 0));
+      function download(buf, filename, type) {
+        const blob = buf instanceof Blob ? buf : new Blob([buf], { type });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = filename;
+        anchor.click();
       }
 
-      // Now the main thread is available again for UI/rendering work...
-      console.log('Waiting for workers...')
+      async function encode() {
+        const canvas = document.querySelector("canvas");
+        const context = canvas.getContext("2d");
+        const width = 1024;
+        const height = 1024;
+        canvas.width = width;
+        canvas.height = height;
+        canvas.style.width = "250px";
+        canvas.style.height = "auto";
 
-      // Get the resulting buffer
-      const buffer = await encoder.finish();
-      console.timeEnd('encode');
-      download(buffer, 'animation.gif', { type: 'image/gif' });
-    }
+        const fps = 30;
+        const duration = 5;
+        const totalFrames = Math.ceil(duration * fps);
 
-    async function createWorkerEncoder (opts = {}) {
-      const {
-        progress = (() => {}),
-        totalFrames,
-        width,
-        height,
-        fps = 30,
-        maxColors = 256,
-        workerCount = 4,
-        format = 'rgb444',
-      } = opts;
+        const fpsInterval = 1 / fps;
+        const delay = fpsInterval * 1000;
 
-      if (!totalFrames) throw new Error('Must specify totalFrames > 0');
-      if (!width || !height) throw new Error('Must specify { width, height }');
+        const render = sketch();
+        const frames = new Array(totalFrames).fill(0).map((_, i) => i);
 
-      const workers = new Array(workerCount).fill(null).map(() => {
-        // Worker modules are Chrome-only at the time of writing
-        return new Worker(workerUrl, { type: 'module' });
-      });
+        console.time("encode");
 
-      const frames = new Array(totalFrames).fill(null);
-
-      const fpsInterval = 1 / fps;
-      const delay = fpsInterval * 1000;
-
-      let remaining = totalFrames;
-      let workerIndex = 0;
-
-      // First we send encoder options to each worker
-      workers.forEach(w => {
-        w.postMessage({
-          event: 'init',
-          repeat: 0,
-          delay,
-          maxColors,
+        // Setup an encoder that we will write frames into
+        const encoder = await createWorkerEncoder({
+          totalFrames,
+          fps,
           width,
           height,
-        })
-      });
+          progress(v) {
+            const el = document.querySelector("#progress");
+            el.textContent = `Progress: ${Math.round(v * 100)}%`;
+          },
+        });
 
-      // Then we wait for all workers to be ready
-      await Promise.all(workers.map(w => waitForReady(w)));
+        // We use for 'of' to loop with async await
+        for (let i of frames) {
+          // a t value 0..1 to animate the frame
+          const playhead = i / totalFrames;
 
-      const gif = GIFEncoder({ auto: false });
+          // Render to 2D context
+          render({ context, width, height, playhead });
 
-      return {
-        addFrame (data, frame) {
-          // We cycle through all workers uniformly
-          const worker = workers[(workerIndex++) % workers.length];
+          // Get RGBA data from canvas
+          const data = context.getImageData(0, 0, width, height).data;
+
           // Send data to worker
-          worker.postMessage([data, frame], [ data.buffer ]);
-          frames[frame] = waitForFrame(worker, frame).then(ev => {
-            const [ data, frame ] = ev.data;
-            nextProgress();
-            return data;
+          encoder.addFrame(data, i);
+
+          // Wait a tick so that we don't lock up browser
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        }
+
+        // Now the main thread is available again for UI/rendering work...
+        console.log("Waiting for workers...");
+
+        // Get the resulting buffer
+        const buffer = await encoder.finish();
+        console.timeEnd("encode");
+        download(buffer, "animation.gif", { type: "image/gif" });
+      }
+
+      async function createWorkerEncoder(opts = {}) {
+        const {
+          progress = () => {},
+          totalFrames,
+          width,
+          height,
+          fps = 30,
+          maxColors = 256,
+          workerCount = 4,
+          format = "rgb444",
+        } = opts;
+
+        if (!totalFrames) throw new Error("Must specify totalFrames > 0");
+        if (!width || !height)
+          throw new Error("Must specify { width, height }");
+
+        const workers = new Array(workerCount).fill(null).map(() => {
+          // Worker modules are Chrome-only at the time of writing
+          return new Worker(workerUrl, { type: "module" });
+        });
+
+        const frames = new Array(totalFrames).fill(null);
+
+        const fpsInterval = 1 / fps;
+        const delay = fpsInterval * 1000;
+
+        let remaining = totalFrames;
+        let workerIndex = 0;
+
+        // First we send encoder options to each worker
+        workers.forEach((w) => {
+          w.postMessage({
+            event: "init",
+            repeat: 0,
+            delay,
+            maxColors,
+            width,
+            height,
           });
-        },
-
-        async finish () {
-          // Once all chunks are ready
-          const chunks = await Promise.all(frames);
-          
-          // Write the header first
-          gif.writeHeader();
-
-          // Now we can write each chunk
-          for (let i = 0; i < chunks.length; i++) {
-            gif.stream.writeBytesView(chunks[i]);
-          }
-
-          // Finish the GIF
-          gif.finish();
-
-          // Close workers
-          workers.forEach(w => w.terminate())
-          workers.length = 0;
-
-          // Return bytes
-          return gif.bytesView();
-        }
-      };
-
-      function nextProgress () {
-        remaining--;
-        const p = (totalFrames - remaining) / totalFrames;
-        progress(p);
-      }
-
-      function waitForReady (worker) {
-        return new Promise((resolve) => {
-          const handler = (ev) => {
-            if (ev.data === 'ready') {
-              worker.removeEventListener("message", handler);
-              resolve(ev);
-            }
-          };
-          worker.addEventListener("message", handler, { passive: true });
         });
-      }
 
-      function waitForFrame(worker, frame) {
-        return new Promise((resolve) => {
-          const handler = (ev) => {
-            if (ev.data[1] === frame) {
-              worker.removeEventListener("message", handler);
-              resolve(ev);
+        // Then we wait for all workers to be ready
+        await Promise.all(workers.map((w) => waitForReady(w)));
+
+        const gif = GIFEncoder({ auto: false });
+
+        return {
+          addFrame(data, frame) {
+            // We cycle through all workers uniformly
+            const worker = workers[workerIndex++ % workers.length];
+            // Send data to worker
+            worker.postMessage([data, frame], [data.buffer]);
+            frames[frame] = waitForFrame(worker, frame).then((ev) => {
+              const [data, frame] = ev.data;
+              nextProgress();
+              return data;
+            });
+          },
+
+          async finish() {
+            // Once all chunks are ready
+            const chunks = await Promise.all(frames);
+
+            // Write the header first
+            gif.writeHeader();
+
+            // Now we can write each chunk
+            for (let i = 0; i < chunks.length; i++) {
+              gif.stream.writeBytesView(chunks[i]);
             }
-          };
-          worker.addEventListener("message", handler, { passive: true });
-        });
-      }
-    }
 
-    // This could be replaced with your own generative artwork...
-    function sketch() {
-      return ({ context, width, height, playhead }) => {
-        context.clearRect(0, 0, width, height);
-        context.fillStyle = "white";
-        context.fillRect(0, 0, width, height);
+            // Finish the GIF
+            gif.finish();
 
-        const gridSize = 7;
-        const padding = width * 0.2;
-        const tileSize = (width - padding * 2) / gridSize;
+            // Close workers
+            workers.forEach((w) => w.terminate());
+            workers.length = 0;
 
-        for (let x = 0; x < gridSize; x++) {
-          for (let y = 0; y < gridSize; y++) {
-            // get a 0..1 UV coordinate
-            const u = gridSize <= 1 ? 0.5 : x / (gridSize - 1);
-            const v = gridSize <= 1 ? 0.5 : y / (gridSize - 1);
+            // Return bytes
+            return gif.bytesView();
+          },
+        };
 
-            // scale to dimensions with a border padding
-            const tx = lerp(padding, width - padding, u);
-            const ty = lerp(padding, height - padding, v);
-
-            // here we get a 't' value between 0..1 that
-            // shifts subtly across the UV coordinates
-            const offset = u * 0.2 + v * 0.1;
-            const t = (playhead + offset) % 1;
-
-            // now we get a value that varies from 0..1 and back
-            let mod = Math.sin(t * Math.PI);
-
-            // we make it 'ease' a bit more dramatically with exponential
-            mod = Math.pow(mod, 3);
-
-            // now choose a length, thickness and initial rotation
-            const length = tileSize * 0.65;
-            const thickness = tileSize * 0.1;
-            const initialRotation = Math.PI / 2;
-
-            // And rotate each line a bit by our modifier
-            const rotation = initialRotation + mod * Math.PI;
-
-            context.fillStyle = `hsl(0, ${v * 100}%, 50%)`;
-
-            // Now render...
-            draw(context, tx, ty, length, thickness, rotation);
-          }
+        function nextProgress() {
+          remaining--;
+          const p = (totalFrames - remaining) / totalFrames;
+          progress(p);
         }
-      };
 
-      function lerp(min, max, t) {
-        return min * (1 - t) + max * t;
+        function waitForReady(worker) {
+          return new Promise((resolve) => {
+            const handler = (ev) => {
+              if (ev.data === "ready") {
+                worker.removeEventListener("message", handler);
+                resolve(ev);
+              }
+            };
+            worker.addEventListener("message", handler, { passive: true });
+          });
+        }
+
+        function waitForFrame(worker, frame) {
+          return new Promise((resolve) => {
+            const handler = (ev) => {
+              if (ev.data[1] === frame) {
+                worker.removeEventListener("message", handler);
+                resolve(ev);
+              }
+            };
+            worker.addEventListener("message", handler, { passive: true });
+          });
+        }
       }
 
-      function draw(context, x, y, length, thickness, rotation) {
-        context.save();
+      // This could be replaced with your own generative artwork...
+      function sketch() {
+        return ({ context, width, height, playhead }) => {
+          context.clearRect(0, 0, width, height);
+          context.fillStyle = "white";
+          context.fillRect(0, 0, width, height);
 
-        // Rotate in place
-        context.translate(x, y);
-        context.rotate(rotation);
-        context.translate(-x, -y);
+          const gridSize = 7;
+          const padding = width * 0.2;
+          const tileSize = (width - padding * 2) / gridSize;
 
-        // Draw the line
-        context.fillRect(x - length / 2, y - thickness / 2, length, thickness);
-        context.restore();
+          for (let x = 0; x < gridSize; x++) {
+            for (let y = 0; y < gridSize; y++) {
+              // get a 0..1 UV coordinate
+              const u = gridSize <= 1 ? 0.5 : x / (gridSize - 1);
+              const v = gridSize <= 1 ? 0.5 : y / (gridSize - 1);
+
+              // scale to dimensions with a border padding
+              const tx = lerp(padding, width - padding, u);
+              const ty = lerp(padding, height - padding, v);
+
+              // here we get a 't' value between 0..1 that
+              // shifts subtly across the UV coordinates
+              const offset = u * 0.2 + v * 0.1;
+              const t = (playhead + offset) % 1;
+
+              // now we get a value that varies from 0..1 and back
+              let mod = Math.sin(t * Math.PI);
+
+              // we make it 'ease' a bit more dramatically with exponential
+              mod = Math.pow(mod, 3);
+
+              // now choose a length, thickness and initial rotation
+              const length = tileSize * 0.65;
+              const thickness = tileSize * 0.1;
+              const initialRotation = Math.PI / 2;
+
+              // And rotate each line a bit by our modifier
+              const rotation = initialRotation + mod * Math.PI;
+
+              context.fillStyle = `hsl(0, ${v * 100}%, 50%)`;
+
+              // Now render...
+              draw(context, tx, ty, length, thickness, rotation);
+            }
+          }
+        };
+
+        function lerp(min, max, t) {
+          return min * (1 - t) + max * t;
+        }
+
+        function draw(context, x, y, length, thickness, rotation) {
+          context.save();
+
+          // Rotate in place
+          context.translate(x, y);
+          context.rotate(rotation);
+          context.translate(-x, -y);
+
+          // Draw the line
+          context.fillRect(
+            x - length / 2,
+            y - thickness / 2,
+            length,
+            thickness
+          );
+          context.restore();
+        }
       }
-    }
-  </script>
-</body>
+    </script>
+  </body>
 </html>

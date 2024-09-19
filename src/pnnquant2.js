@@ -106,9 +106,7 @@ function create_bin_list(data, format) {
       bin.ac += a;
       bin.cnt++;
     }
-  }
-  
-  else if (format === "rgb444") {
+  } else if (format === "rgb444") {
     for (let i = 0; i < size; ++i) {
       const color = data[i];
       const b = (color >> 16) & 0xff;
@@ -152,12 +150,12 @@ export default function quantize(rgba, maxColors, opts = {}) {
   } = opts;
 
   if (!rgba || !rgba.buffer) {
-    throw new Error('quantize() expected RGBA Uint8Array data');
+    throw new Error("quantize() expected RGBA Uint8Array data");
   }
   if (!(rgba instanceof Uint8Array) && !(rgba instanceof Uint8ClampedArray)) {
-    throw new Error('quantize() expected RGBA Uint8Array data');
+    throw new Error("quantize() expected RGBA Uint8Array data");
   }
-  
+
   const data = new Uint32Array(rgba.buffer);
 
   let useSqrt = opts.useSqrt !== false;

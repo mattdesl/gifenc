@@ -28,7 +28,7 @@ type Encoder = {
     index: Uint8Array,
     width: number,
     height: number,
-    ops?: WriteFrameOpts
+    ops?: WriteFrameOpts,
   ) => void;
   finish: () => void;
   bytes: () => Uint8Array;
@@ -42,24 +42,23 @@ type Encoder = {
 export declare function quantize(
   rgba: Uint8Array | Uint8ClampedArray,
   maxColors: number,
-  options?: QuantizeOptions
+  options?: QuantizeOptions,
 ): number[][];
 
 export declare function applyPalette(
   rgba: Uint8Array | Uint8ClampedArray,
   palette: number[][],
-  format?: Format
+  format?: Format,
 ): Uint8Array;
 
-export declare function GIFEncoder (opts?: GIFEncoderOpts): Encoder;
+export declare function GIFEncoder(opts?: GIFEncoderOpts): Encoder;
 
 export declare function nearestColorIndex(
   palette: number[][],
-  pixel: [number, number, number] | [number, number, number]
+  pixel: [number, number, number] | [number, number, number],
 ): number;
 
 export declare function nearestColorIndexWithDistance(
   palette: number[][],
-  pixel: [number, number, number] | [number, number, number]
+  pixel: [number, number, number] | [number, number, number],
 ): [number, number];
-
