@@ -35,15 +35,21 @@ export function prequantize(
   }
 }
 
-export function applyPalette(rgba, palette, format = "rgb565") {
+export function applyPalette(rgba, palette, options = "rgb565") {
   if (!rgba || !rgba.buffer) {
-    throw new Error("quantize() expected RGBA Uint8Array data");
+    throw new Error("applyPalette() expected RGBA Uint8Array data");
   }
   if (!(rgba instanceof Uint8Array) && !(rgba instanceof Uint8ClampedArray)) {
-    throw new Error("quantize() expected RGBA Uint8Array data");
+    throw new Error("applyPalette() expected RGBA Uint8Array data");
   }
   if (palette.length > 256) {
     throw new Error("applyPalette() only works with 256 colors or less");
+  }
+
+  const opts = normalizeApplyPaletteOptions(options);
+  const { format } = opts;
+  if (opts.dither) {
+    return applyPaletteDither(rgba, palette, opts);
   }
 
   const data = new Uint32Array(rgba.buffer);
@@ -87,6 +93,216 @@ export function applyPalette(rgba, palette, format = "rgb565") {
   }
 
   return index;
+}
+
+function normalizeApplyPaletteOptions(options) {
+  if (typeof options === "string") {
+    return { format: options, dither: false };
+  }
+  if (options == null) {
+    return { format: "rgb565", dither: false };
+  }
+  if (typeof options !== "object") {
+    throw new Error(
+      "applyPalette() expected options to be a format string or an options object",
+    );
+  }
+
+  const dither = options.dither === true ? "floyd-steinberg" : options.dither;
+  if (dither && dither !== "floyd-steinberg") {
+    throw new Error(
+      `applyPalette() unsupported dither algorithm: ${options.dither}`,
+    );
+  }
+
+  let ditherStrength = 1;
+  if (dither) {
+    ditherStrength =
+      options.ditherStrength == null ? 1 : Number(options.ditherStrength);
+    if (!Number.isFinite(ditherStrength)) {
+      throw new Error("applyPalette() expected ditherStrength to be a number");
+    }
+  }
+
+  return {
+    format: options.format || "rgb565",
+    dither: dither || false,
+    width: options.width,
+    height: options.height,
+    ditherStrength: Math.max(0, ditherStrength),
+    serpentine: options.serpentine !== false,
+  };
+}
+
+function applyPaletteDither(rgba, palette, opts) {
+  const { format, width, height, ditherStrength, serpentine } = opts;
+  const length = rgba.length / 4;
+  if (length !== Math.floor(length)) {
+    throw new Error("applyPalette() expected RGBA data length to divide by 4");
+  }
+  if (!width || width < 1 || width !== Math.floor(width)) {
+    throw new Error("applyPalette() requires { width } when dithering");
+  }
+
+  const resolvedHeight = height == null ? length / width : height;
+  if (
+    resolvedHeight < 1 ||
+    resolvedHeight !== Math.floor(resolvedHeight) ||
+    width * resolvedHeight !== length
+  ) {
+    throw new Error(
+      "applyPalette() requires { width, height } to match RGBA data when dithering",
+    );
+  }
+
+  const hasAlpha = format === "rgba4444";
+  const channels = hasAlpha ? 4 : 3;
+  const pixels = new Float32Array(length * channels);
+  const index = new Uint8Array(length);
+
+  for (let i = 0, j = 0; i < rgba.length; i += 4, j += channels) {
+    pixels[j] = rgba[i];
+    pixels[j + 1] = rgba[i + 1];
+    pixels[j + 2] = rgba[i + 2];
+    if (hasAlpha) pixels[j + 3] = rgba[i + 3];
+  }
+
+  for (let y = 0; y < resolvedHeight; y++) {
+    const reverse = serpentine && y % 2 === 1;
+    const xStart = reverse ? width - 1 : 0;
+    const xEnd = reverse ? -1 : width;
+    const step = reverse ? -1 : 1;
+
+    for (let x = xStart; x !== xEnd; x += step) {
+      const idx = y * width + x;
+      const pixelOffset = idx * channels;
+      const r = clampByte(pixels[pixelOffset]);
+      const g = clampByte(pixels[pixelOffset + 1]);
+      const b = clampByte(pixels[pixelOffset + 2]);
+      const a = hasAlpha ? clampByte(pixels[pixelOffset + 3]) : 0xff;
+      const paletteIndex = hasAlpha
+        ? nearestColorIndexRGBA(r, g, b, a, palette)
+        : nearestColorIndexRGB(r, g, b, palette);
+      const color = palette[paletteIndex];
+      if (!color) {
+        throw new Error(
+          "applyPalette() expected a non-empty palette when dithering",
+        );
+      }
+
+      index[idx] = paletteIndex;
+      diffuseError(
+        pixels,
+        channels,
+        width,
+        resolvedHeight,
+        x,
+        y,
+        reverse,
+        ditherStrength,
+        r - color[0],
+        g - color[1],
+        b - color[2],
+        hasAlpha ? a - color[3] : 0,
+      );
+    }
+  }
+
+  return index;
+}
+
+function diffuseError(
+  pixels,
+  channels,
+  width,
+  height,
+  x,
+  y,
+  reverse,
+  strength,
+  er,
+  eg,
+  eb,
+  ea,
+) {
+  const direction = reverse ? -1 : 1;
+  addError(
+    pixels,
+    channels,
+    width,
+    height,
+    x + direction,
+    y,
+    er,
+    eg,
+    eb,
+    ea,
+    (strength * 7) / 16,
+  );
+  addError(
+    pixels,
+    channels,
+    width,
+    height,
+    x - direction,
+    y + 1,
+    er,
+    eg,
+    eb,
+    ea,
+    (strength * 3) / 16,
+  );
+  addError(
+    pixels,
+    channels,
+    width,
+    height,
+    x,
+    y + 1,
+    er,
+    eg,
+    eb,
+    ea,
+    (strength * 5) / 16,
+  );
+  addError(
+    pixels,
+    channels,
+    width,
+    height,
+    x + direction,
+    y + 1,
+    er,
+    eg,
+    eb,
+    ea,
+    (strength * 1) / 16,
+  );
+}
+
+function addError(
+  pixels,
+  channels,
+  width,
+  height,
+  x,
+  y,
+  er,
+  eg,
+  eb,
+  ea,
+  amount,
+) {
+  if (x < 0 || x >= width || y < 0 || y >= height) return;
+  const idx = (y * width + x) * channels;
+  pixels[idx] += er * amount;
+  pixels[idx + 1] += eg * amount;
+  pixels[idx + 2] += eb * amount;
+  if (channels === 4) pixels[idx + 3] += ea * amount;
+}
+
+function clampByte(value) {
+  return value < 0 ? 0 : value > 0xff ? 0xff : Math.round(value);
 }
 
 function nearestColorIndexRGBA(r, g, b, a, palette) {

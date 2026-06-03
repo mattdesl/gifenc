@@ -8,6 +8,15 @@ type QuantizeOptions = {
   clearAlphaColor?: number;
 };
 
+type ApplyPaletteOptions = {
+  format?: Format;
+  dither?: boolean | "floyd-steinberg";
+  width?: number;
+  height?: number;
+  ditherStrength?: number;
+  serpentine?: boolean;
+};
+
 type GIFEncoderOpts = {
   auto?: boolean;
   initialCapacity?: number;
@@ -48,7 +57,7 @@ export declare function quantize(
 export declare function applyPalette(
   rgba: Uint8Array | Uint8ClampedArray,
   palette: number[][],
-  format?: Format,
+  options?: Format | ApplyPaletteOptions,
 ): Uint8Array;
 
 export declare function GIFEncoder(opts?: GIFEncoderOpts): Encoder;
